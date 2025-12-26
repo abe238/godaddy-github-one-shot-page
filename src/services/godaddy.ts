@@ -1,19 +1,22 @@
 import type { DNSRecord } from '../types.js';
+import { getGoDaddyConfig } from '../config.js';
 
-const API_BASE = 'https://api.godaddy.com/v1';
+const API_BASE_PROD = 'https://api.godaddy.com/v1';
+const API_BASE_OTE = 'https://api.ote-godaddy.com/v1';
 
 export class GoDaddyService {
   private apiKey: string;
   private apiSecret: string;
+  private apiBase: string;
 
   constructor() {
-    const key = process.env.GODADDY_API_KEY;
-    const secret = process.env.GODADDY_API_SECRET;
-    if (!key || !secret) {
-      throw new Error('GODADDY_API_KEY and GODADDY_API_SECRET required in .env');
+    const config = getGoDaddyConfig();
+    if (!config) {
+      throw new Error('GoDaddy not configured. Add API credentials in settings.');
     }
-    this.apiKey = key;
-    this.apiSecret = secret;
+    this.apiKey = config.apiKey;
+    this.apiSecret = config.apiSecret;
+    this.apiBase = config.environment === 'ote' ? API_BASE_OTE : API_BASE_PROD;
   }
 
   private get headers() {
@@ -24,13 +27,13 @@ export class GoDaddyService {
   }
 
   async listDomains(): Promise<Array<{ domain: string; status: string }>> {
-    const res = await fetch(`${API_BASE}/domains`, { headers: this.headers });
+    const res = await fetch(`${this.apiBase}/domains`, { headers: this.headers });
     if (!res.ok) throw new Error(`GoDaddy API error: ${res.status}`);
     return res.json() as Promise<Array<{ domain: string; status: string }>>;
   }
 
   async getDNSRecords(domain: string): Promise<DNSRecord[]> {
-    const res = await fetch(`${API_BASE}/domains/${domain}/records`, {
+    const res = await fetch(`${this.apiBase}/domains/${domain}/records`, {
       headers: this.headers,
     });
     if (!res.ok) throw new Error(`GoDaddy API error: ${res.status}`);
@@ -45,14 +48,14 @@ export class GoDaddyService {
       { data: '185.199.111.153', ttl: 600 },
     ];
 
-    const aRes = await fetch(`${API_BASE}/domains/${domain}/records/A/@`, {
+    const aRes = await fetch(`${this.apiBase}/domains/${domain}/records/A/@`, {
       method: 'PUT',
       headers: this.headers,
       body: JSON.stringify(aRecords),
     });
     if (!aRes.ok) throw new Error(`Failed to set A records: ${aRes.status}`);
 
-    const cnameRes = await fetch(`${API_BASE}/domains/${domain}/records/CNAME/www`, {
+    const cnameRes = await fetch(`${this.apiBase}/domains/${domain}/records/CNAME/www`, {
       method: 'PUT',
       headers: this.headers,
       body: JSON.stringify([{ data: `${githubUser}.github.io`, ttl: 600 }]),

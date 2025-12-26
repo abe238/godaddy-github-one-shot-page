@@ -1,114 +1,135 @@
 # gg-deploy
 
-I got tired of clicking through GoDaddy's UI every time I wanted to point a domain at GitHub Pages. This automates the whole thing: DNS records, CNAME file, Pages config, SSL verification.
+Automates GoDaddy DNS + GitHub Pages deployment. DNS records, CNAME file, Pages config, SSL—all in one command.
 
-Works from the command line. Works from Claude Code. Works from a browser UI.
+Works from CLI, browser UI, or Claude Code.
 
 ## Quick Start
 
 ```bash
-# Preview what will change (safe, no modifications)
-npx gg-deploy plan abediaz.ai abe238/abediaz.ai
-
-# Execute deployment
-npx gg-deploy apply abediaz.ai abe238/abediaz.ai
-
-# Check if everything's working
-npx gg-deploy status abediaz.ai abe238/abediaz.ai
+npx gg-deploy ui
+# Opens http://localhost:3847
 ```
 
-## What It Does
+Or via CLI:
+```bash
+npx gg-deploy plan example.com user/repo    # Preview (safe)
+npx gg-deploy apply example.com user/repo   # Deploy
+npx gg-deploy status example.com user/repo  # Health check
+```
 
-1. **Configures GoDaddy DNS** - Sets A records pointing to GitHub Pages IPs, adds www CNAME
-2. **Creates CNAME file** - Adds the CNAME file to your repo so GitHub knows the custom domain
-3. **Enables GitHub Pages** - Configures Pages with your custom domain
-4. **Monitors SSL** - Checks certificate provisioning status
+## Requirements
 
-The whole flow takes about 60 seconds. DNS propagation takes longer; the 600s TTL means you might wait 10 minutes to an hour for full propagation.
+- **Node.js 18+** — Check with `node --version`
+- **GoDaddy account** with API access enabled
+- **GitHub account** with a Personal Access Token
+- **Domain on GoDaddy** you want to point to GitHub Pages
+- **GitHub repo** with your site content (index.html or built site)
 
 ## Setup
 
-### GoDaddy API Credentials
+Credentials are saved once to `~/.gg-deploy/config.json` and work across all projects.
 
+### Option 1: Web UI (Recommended)
+
+```bash
+npx gg-deploy ui
+```
+
+The setup wizard walks you through:
+1. Creating a GoDaddy API key
+2. Creating a GitHub token
+3. Testing and saving credentials
+
+### Option 2: Manual Config
+
+Create `~/.gg-deploy/config.json`:
+```json
+{
+  "godaddy": {
+    "apiKey": "YOUR_KEY",
+    "apiSecret": "YOUR_SECRET",
+    "environment": "production"
+  },
+  "github": {
+    "token": "ghp_YOUR_TOKEN"
+  }
+}
+```
+
+### Getting Credentials
+
+**GoDaddy API Key:**
 1. Go to https://developer.godaddy.com/keys
-2. Create a new API key (Production environment)
-3. Save the key and secret
+2. Click "Create New API Key"
+3. Select **Production** (not OTE/Test)
+4. Copy Key and Secret immediately (secret shown only once)
 
-```bash
-# Create .env file
-cat > .env << 'EOF'
-GODADDY_API_KEY=your-key-here
-GODADDY_API_SECRET=your-secret-here
-EOF
-```
-
-### GitHub CLI
-
-Make sure you're authenticated with the GitHub CLI:
-
-```bash
-gh auth login
-```
-
-## Commands
-
-### plan
-
-Preview deployment without making changes. Safe to run anytime.
-
-```bash
-gg-deploy plan example.com user/repo
-```
-
-### apply
-
-Execute the deployment. Configures DNS, creates CNAME, enables Pages.
-
-```bash
-gg-deploy apply example.com user/repo
-```
-
-### status
-
-Check deployment health: DNS configuration, Pages status, SSL state.
-
-```bash
-gg-deploy status example.com user/repo
-```
-
-### mcp-serve
-
-Start the MCP server for Claude Desktop/Code integration.
-
-```bash
-gg-deploy mcp-serve
-```
-
-### ui
-
-Launch the local web interface. No CLI needed.
-
-```bash
-gg-deploy ui
-# Opens at http://localhost:3847
-```
+**GitHub Token:**
+1. Go to https://github.com/settings/tokens/new?description=gg-deploy&scopes=repo
+2. Click "Generate token"
+3. Copy the token (starts with `ghp_`)
 
 ## Web Interface
 
-Don't like terminals? Run `gg-deploy ui` and you get a clean web interface:
+### Main Screen
 
-1. Enter your domain
-2. Enter your GitHub repo
-3. Click Deploy
-4. Watch the progress in real-time
+| Element | Description |
+|---------|-------------|
+| **Domain field** | Your GoDaddy domain (e.g., `example.com`) |
+| **Repository field** | GitHub repo as `username/repo` |
+| **Deploy button** | Starts the deployment process |
+| **Status badges** | Show GoDaddy/GitHub connection status |
+| **Settings gear** | Opens credential management |
 
-Same functionality as the CLI, but clickable.
+### Status Indicators
 
-## Claude Code / MCP Integration
+| Color | Meaning |
+|-------|---------|
+| Green (glowing) | Connected and verified |
+| Yellow (pulsing) | Testing connection... |
+| Red | Error (hover for details) |
+| Gray | Not tested yet |
 
-This tool works as an MCP server, so Claude Code can deploy sites directly.
+Hover over badges for detailed status. Click the refresh button to re-test connections.
 
-Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+### Settings Screen
+
+- **API Key / Secret / Token fields** — Pre-filled with saved values (masked)
+- **Eye icon** — Click to reveal value for copying
+- **Status indicators** — Show live verification status
+- **Test button** — Re-verify API connections
+- **Update Settings** — Save changes
+
+### Deployment Flow
+
+1. Enter domain and repo
+2. Click Deploy
+3. Watch real-time progress:
+   - Verify domain ownership
+   - Check repository access
+   - Configure DNS records
+   - Add CNAME file
+   - Enable GitHub Pages
+   - Provision SSL certificate
+4. Get your live URL
+
+## CLI Commands
+
+| Command | Description | Safe |
+|---------|-------------|------|
+| `plan <domain> <repo>` | Preview changes | Yes |
+| `apply <domain> <repo>` | Execute deployment | No |
+| `status <domain> <repo>` | Check health | Yes |
+| `ui` | Launch web interface | Yes |
+| `mcp-serve` | Start MCP server | Yes |
+| `describe` | Output tool schema | Yes |
+
+Add `--output json` for machine-readable output.
+
+## Claude Code / MCP
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
@@ -121,76 +142,105 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 }
 ```
 
-Then just tell Claude: "Deploy my site at example.com using abe238/example repo"
+Then tell Claude: "Deploy example.com using user/repo"
 
-### Available MCP Tools
+## Troubleshooting
 
-| Tool | Description | Safe |
-|------|-------------|------|
-| `deploy_site_plan` | Preview changes | Yes |
-| `deploy_site_apply` | Execute deployment | No (confirmation required) |
-| `deploy_site_status` | Health check | Yes |
+### Node.js Issues
 
-## AI-Native Design
+| Problem | Solution |
+|---------|----------|
+| `node: command not found` | Install Node.js from https://nodejs.org |
+| `unsupported engine` | Upgrade to Node.js 18+ |
+| `EACCES permission denied` | Don't use `sudo`. Fix npm permissions or use nvm |
 
-This CLI was built for AI agents from the start:
+### GoDaddy API Issues
 
-- **Structured JSON output**: `--output json` for machine-parseable responses
-- **Self-describing**: `gg-deploy describe` outputs tool schema for agent discovery
-- **Consistent exit codes**: 0=success, 1=validation error, 2=partial success, 3=failure
-- **Safe commands marked**: `plan` and `status` can run without confirmation
+| Problem | Solution |
+|---------|----------|
+| `401 Unauthorized` | Wrong API key/secret. Regenerate at developer.godaddy.com |
+| `403 Forbidden` | API key is for OTE (test). Create a **Production** key |
+| `404 Not Found` | Domain not in your GoDaddy account |
+| `422 Invalid` | Domain locked or has pending transfers |
+| Red status dot | Hover for error. Usually auth issue |
+
+### GitHub API Issues
+
+| Problem | Solution |
+|---------|----------|
+| `401 Bad credentials` | Token expired or invalid. Generate new one |
+| `403 Forbidden` | Token missing `repo` scope. Regenerate with correct scope |
+| `404 Not Found` | Repo doesn't exist or token can't access it |
+| Private repo fails | Need GitHub Pro for private repo Pages |
+
+### DNS Issues
+
+| Problem | Solution |
+|---------|----------|
+| Site not loading | Wait 10-60 min for DNS propagation |
+| Wrong IP showing | Clear DNS cache: `sudo dscacheutil -flushcache` (Mac) |
+| SSL not working | GitHub needs DNS to resolve first. Check Pages settings |
+
+### Config Issues
+
+| Problem | Solution |
+|---------|----------|
+| "Not configured" | Check `~/.gg-deploy/config.json` exists |
+| Can't find config | It's in your home directory: `ls -la ~/.gg-deploy/` |
+| Permission denied | Run `chmod 600 ~/.gg-deploy/config.json` |
+
+### UI Issues
+
+| Problem | Solution |
+|---------|----------|
+| Port 3847 in use | Kill existing: `lsof -i :3847` then `kill <PID>` |
+| Blank page | Clear browser cache or try incognito |
+| Eye icon not working | Click reveals value if credentials are saved |
+
+### Common Fixes
 
 ```bash
-# Example: JSON output for automation
-gg-deploy status example.com user/repo --output json
+# Check if config exists
+cat ~/.gg-deploy/config.json
+
+# Verify Node version
+node --version  # Should be 18+
+
+# Test GoDaddy API manually
+curl -H "Authorization: sso-key YOUR_KEY:YOUR_SECRET" \
+  https://api.godaddy.com/v1/domains
+
+# Test GitHub API manually
+curl -H "Authorization: Bearer ghp_YOUR_TOKEN" \
+  https://api.github.com/user
 ```
-
-## Real Example
-
-I used this to deploy [abediaz.ai](https://abediaz.ai):
-
-```bash
-$ gg-deploy apply abediaz.ai abe238/abediaz.ai
-
-=== Deploying ===
-
-✔ Domain verified
-✔ Repository verified
-✔ DNS records configured
-✔ CNAME file added
-✔ GitHub Pages enabled
-✔ Custom domain set
-
-=== Deployment Complete ===
-
-Site URL: https://abediaz.ai
-```
-
-## Requirements
-
-- Node.js 18+
-- GoDaddy account with API access
-- GitHub CLI (`gh`) authenticated
-- A domain registered on GoDaddy
-- A GitHub repository with your site content
 
 ## How It Works
 
-1. **DNS**: Sets four A records pointing to GitHub's Pages IPs (185.199.108-111.153) and a www CNAME pointing to your-username.github.io
-2. **Repository**: Creates a CNAME file in your repo root containing your domain name
-3. **Pages**: Enables GitHub Pages on the main branch with your custom domain
-4. **SSL**: GitHub automatically provisions a Let's Encrypt certificate once DNS resolves
+1. **DNS** — Sets A records to GitHub IPs (185.199.108-111.153) + www CNAME
+2. **CNAME** — Creates CNAME file in repo with your domain
+3. **Pages** — Enables GitHub Pages on main branch
+4. **SSL** — GitHub auto-provisions Let's Encrypt certificate
+
+Total time: ~60 seconds. DNS propagation: 10-60 minutes.
+
+## Security
+
+- Credentials stored in `~/.gg-deploy/config.json` (permission 600)
+- Never committed to git
+- Eye icon reveals values only locally
+- API calls made directly to GoDaddy/GitHub (no proxy)
 
 ## Limitations
 
-- Only works with GoDaddy (for now)
-- Requires public repos or GitHub Pro for private repo Pages
-- Can't configure subdomains other than www
-- No Cloudflare/Namecheap support yet
+- GoDaddy only (no Cloudflare/Namecheap yet)
+- Public repos or GitHub Pro required for Pages
+- Only www subdomain supported
+- One domain per deployment
 
 ## License
 
-MIT
+AGPL-3.0 — Free to use, modify, and distribute. Forks must remain open source.
 
 ---
 

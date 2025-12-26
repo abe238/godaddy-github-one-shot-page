@@ -5,6 +5,14 @@ import { fileURLToPath } from 'url';
 import { planCommand } from './commands/plan.js';
 import { applyCommand } from './commands/apply.js';
 import { statusCommand } from './commands/status.js';
+import {
+  getAuthStatus,
+  saveGoDaddyConfig,
+  saveGitHubConfig,
+  getConfigPath,
+  getGoDaddyConfig,
+  getGitHubConfig,
+} from './config.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const UI_DIR = join(__dirname, '..', 'ui', 'dist');
@@ -51,6 +59,99 @@ export async function startUiServer() {
     if (path === '/api/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: 'ok' }));
+      return;
+    }
+
+    if (path === '/api/auth-status') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(getAuthStatus()));
+      return;
+    }
+
+    if (path === '/api/config/values') {
+      const gdConfig = getGoDaddyConfig();
+      const ghConfig = getGitHubConfig();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        godaddy: gdConfig ? { apiKey: gdConfig.apiKey, apiSecret: gdConfig.apiSecret } : null,
+        github: ghConfig ? { token: ghConfig.token } : null,
+      }));
+      return;
+    }
+
+    if (path === '/api/test-connection') {
+      const result = {
+        godaddy: { configured: false, verified: false, error: null as string | null },
+        github: { configured: false, verified: false, error: null as string | null, user: null as string | null },
+      };
+
+      const gdConfig = getGoDaddyConfig();
+      if (gdConfig) {
+        result.godaddy.configured = true;
+        try {
+          const gdRes = await fetch('https://api.godaddy.com/v1/domains?limit=1', {
+            headers: {
+              Authorization: `sso-key ${gdConfig.apiKey}:${gdConfig.apiSecret}`,
+            },
+          });
+          if (gdRes.ok) {
+            result.godaddy.verified = true;
+          } else {
+            result.godaddy.error = `API returned ${gdRes.status}`;
+          }
+        } catch (e) {
+          result.godaddy.error = String(e);
+        }
+      }
+
+      const ghConfig = getGitHubConfig();
+      if (ghConfig) {
+        result.github.configured = true;
+        try {
+          const ghRes = await fetch('https://api.github.com/user', {
+            headers: {
+              Authorization: `Bearer ${ghConfig.token}`,
+              Accept: 'application/vnd.github+json',
+            },
+          });
+          if (ghRes.ok) {
+            const userData = await ghRes.json() as { login: string };
+            result.github.verified = true;
+            result.github.user = userData.login;
+          } else {
+            result.github.error = `API returned ${ghRes.status}`;
+          }
+        } catch (e) {
+          result.github.error = String(e);
+        }
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+      return;
+    }
+
+    if (path === '/api/config' && req.method === 'POST') {
+      const body = await parseBody(req);
+      const data = JSON.parse(body);
+
+      try {
+        if (data.godaddy) {
+          saveGoDaddyConfig(
+            data.godaddy.apiKey,
+            data.godaddy.apiSecret,
+            data.godaddy.environment || 'production'
+          );
+        }
+        if (data.github) {
+          saveGitHubConfig(data.github.token);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, configPath: getConfigPath() }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: String(e) }));
+      }
       return;
     }
 

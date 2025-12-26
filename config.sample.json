@@ -1,0 +1,10 @@
+{
+  "godaddy": {
+    "apiKey": "YOUR_GODADDY_API_KEY",
+    "apiSecret": "YOUR_GODADDY_API_SECRET",
+    "environment": "production"
+  },
+  "github": {
+    "token": "ghp_YOUR_GITHUB_PERSONAL_ACCESS_TOKEN"
+  }
+}
