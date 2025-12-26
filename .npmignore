@@ -1,0 +1,31 @@
+# Images - not needed for npm package
+images/
+img/
+
+# Tauri desktop app - not needed for npm
+src-tauri/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Build artifacts
+bin/
+
+# Development
+.github/
+scripts/
+*.config.js
+.env*
+!.env.example
+
+# Source (dist is enough)
+src/
+
+# UI source (dist is enough)
+ui/src/
+ui/*.html
+ui/*.json
+ui/*.ts
+ui/node_modules/

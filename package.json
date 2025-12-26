@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "gg-deploy": "./dist/cli.js"
+    "gg-deploy": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
