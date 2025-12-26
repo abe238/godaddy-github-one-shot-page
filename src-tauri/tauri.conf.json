@@ -26,7 +26,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRGOUI3NzFEMDdFRTA5MDQKUldRRUNlNEhIWGViVDA3QUVVUUJmS2NtamRFT0JlTVQ5Q1lhcFFhcjBSQUZueXBRc2cvKzhsWTYK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYyNUI4MEI4NTU3MjVFQTQKUldTa1huSlZ1SUJiWW5CaWxWMkhjQ0xweEg3QTB4RVdETVBUa2dJdHhQcUNpcG1OQ1c4MzdFZ1oK",
       "endpoints": [
         "https://github.com/abe238/gg-deploy/releases/latest/download/latest.json"
       ]
