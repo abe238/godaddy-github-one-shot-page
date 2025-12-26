@@ -1,6 +1,6 @@
 import { createServer, IncomingMessage } from 'http';
 import { readFileSync, existsSync } from 'fs';
-import { join, extname } from 'path';
+import { join, extname, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { planCommand } from './commands/plan.js';
 import { applyCommand } from './commands/apply.js';
@@ -14,8 +14,22 @@ import {
   getGitHubConfig,
 } from './config.js';
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const UI_DIR = join(__dirname, '..', 'ui', 'dist');
+function getProjectRoot(): string {
+  // When running as pkg binary, use snapshot path
+  if ((process as any).pkg) {
+    return dirname(process.execPath);
+  }
+  // When running as ESM module, derive from import.meta.url
+  try {
+    return dirname(fileURLToPath(new URL('.', import.meta.url)));
+  } catch {
+    // Fallback for CJS bundled by esbuild
+    return process.cwd();
+  }
+}
+
+const __dirname = getProjectRoot();
+const UI_DIR = join(__dirname, 'ui', 'dist');
 const PORT = 3847;
 
 const MIME_TYPES: Record<string, string> = {

@@ -1,0 +1,211 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: macos-arm64
+            pkg_target: node18-macos-arm64
+          - os: macos-13
+            target: macos-x64
+            pkg_target: node18-macos-x64
+          - os: ubuntu-latest
+            target: linux-x64
+            pkg_target: node18-linux-x64
+          - os: ubuntu-latest
+            target: linux-arm64
+            pkg_target: node18-linux-arm64
+          - os: windows-latest
+            target: win-x64
+            pkg_target: node18-win-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Bundle with esbuild
+        run: |
+          npx esbuild dist/cli.js \
+            --bundle \
+            --platform=node \
+            --target=node18 \
+            --outfile=cli.bundle.cjs \
+            --format=cjs \
+            --external:fsevents \
+            --minify
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build binary (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          npx pkg cli.bundle.cjs \
+            --target ${{ matrix.pkg_target }} \
+            --output gg-deploy-${{ steps.version.outputs.version }}-${{ matrix.target }} \
+            --compress GZip
+
+      - name: Build binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          npx pkg cli.bundle.cjs --target ${{ matrix.pkg_target }} --output gg-deploy-${{ steps.version.outputs.version }}-${{ matrix.target }}.exe --compress GZip
+
+      - name: Create tarball (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          tar -czvf gg-deploy-${{ steps.version.outputs.version }}-${{ matrix.target }}.tar.gz \
+            gg-deploy-${{ steps.version.outputs.version }}-${{ matrix.target }}
+
+      - name: Create zip (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Compress-Archive -Path gg-deploy-${{ steps.version.outputs.version }}-${{ matrix.target }}.exe -DestinationPath gg-deploy-${{ steps.version.outputs.version }}-${{ matrix.target }}.zip
+
+      - name: Upload artifact (Unix)
+        if: runner.os != 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gg-deploy-${{ matrix.target }}
+          path: gg-deploy-${{ steps.version.outputs.version }}-${{ matrix.target }}.tar.gz
+
+      - name: Upload artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gg-deploy-${{ matrix.target }}
+          path: gg-deploy-${{ steps.version.outputs.version }}-${{ matrix.target }}.zip
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: GG Deploy v${{ steps.version.outputs.version }}
+          tag_name: v${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip
+          body: |
+            ## GG Deploy v${{ steps.version.outputs.version }}
+
+            **Free hosting deserves free tooling.** Domain → GitHub Pages in 60 seconds.
+
+            ### Downloads
+
+            | Platform | Architecture | Download |
+            |----------|--------------|----------|
+            | macOS | Apple Silicon (M1/M2/M3) | `gg-deploy-${{ steps.version.outputs.version }}-macos-arm64.tar.gz` |
+            | macOS | Intel | `gg-deploy-${{ steps.version.outputs.version }}-macos-x64.tar.gz` |
+            | Linux | x64 | `gg-deploy-${{ steps.version.outputs.version }}-linux-x64.tar.gz` |
+            | Linux | ARM64 | `gg-deploy-${{ steps.version.outputs.version }}-linux-arm64.tar.gz` |
+            | Windows | x64 | `gg-deploy-${{ steps.version.outputs.version }}-win-x64.zip` |
+
+            ### Quick Install
+
+            **macOS (Apple Silicon):**
+            ```bash
+            curl -L https://github.com/abe238/gg-deploy/releases/download/v${{ steps.version.outputs.version }}/gg-deploy-${{ steps.version.outputs.version }}-macos-arm64.tar.gz | tar xz
+            sudo mv gg-deploy-* /usr/local/bin/gg-deploy
+            ```
+
+            **Or use npm:**
+            ```bash
+            npx gg-deploy ui
+            ```
+
+            ---
+            🤖 Generated with [Claude Code](https://claude.com/claude-code)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-npm:
+    name: Publish to npm
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

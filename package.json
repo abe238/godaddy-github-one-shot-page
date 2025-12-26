@@ -1,7 +1,7 @@
 {
   "name": "gg-deploy",
-  "version": "0.1.0",
-  "description": "Deploy any domain to GitHub Pages in one command. DNS records, CNAME, SSL—automated.",
+  "version": "1.0.0",
+  "description": "Free hosting deserves free tooling. Domain → GitHub Pages in 60 seconds.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -13,7 +13,9 @@
     "start": "node dist/cli.js",
     "lint": "eslint src --ext .ts",
     "test": "vitest",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "build:binary": "node scripts/build-binary.mjs",
+    "bundle": "esbuild dist/cli.js --bundle --platform=node --target=node18 --outfile=bin/cli.bundle.cjs --format=cjs --external:fsevents --minify"
   },
   "keywords": [
     "cli",
@@ -42,9 +44,23 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "esbuild": "^0.24.2",
     "eslint": "^9.17.0",
+    "pkg": "^5.8.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
+  },
+  "pkg": {
+    "scripts": "bin/cli.bundle.cjs",
+    "assets": [],
+    "targets": [
+      "node18-macos-arm64",
+      "node18-macos-x64",
+      "node18-linux-x64",
+      "node18-linux-arm64",
+      "node18-win-x64"
+    ],
+    "outputPath": "bin"
   }
 }

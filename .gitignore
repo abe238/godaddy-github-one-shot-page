@@ -4,6 +4,9 @@ node_modules/
 # Build output (main TypeScript, but NOT ui/dist which is needed)
 /dist/
 
+# Binary build artifacts
+/bin/
+
 # Environment variables - NEVER COMMIT
 .env
 .env.local

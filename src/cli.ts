@@ -12,8 +12,8 @@ const program = new Command();
 
 program
   .name('gg-deploy')
-  .description('Deploy any domain to GitHub Pages in one command')
-  .version('0.1.0');
+  .description('Free hosting deserves free tooling. Domain → GitHub Pages in 60 seconds.')
+  .version('1.0.0');
 
 program
   .command('plan')
