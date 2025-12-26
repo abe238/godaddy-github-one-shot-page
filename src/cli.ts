@@ -5,6 +5,7 @@ import { planCommand } from './commands/plan.js';
 import { applyCommand } from './commands/apply.js';
 import { statusCommand } from './commands/status.js';
 import { startMcpServer } from './mcp-server.js';
+import { startUiServer } from './ui-server.js';
 import type { OutputFormat } from './types.js';
 
 const program = new Command();
@@ -120,6 +121,13 @@ program
   .description('Start MCP server for Claude Desktop/Code integration')
   .action(async () => {
     await startMcpServer();
+  });
+
+program
+  .command('ui')
+  .description('Start local web interface')
+  .action(async () => {
+    await startUiServer();
   });
 
 program.parse();

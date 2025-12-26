@@ -84,6 +84,26 @@ Start the MCP server for Claude Desktop/Code integration.
 gg-deploy mcp-serve
 ```
 
+### ui
+
+Launch the local web interface. No CLI needed.
+
+```bash
+gg-deploy ui
+# Opens at http://localhost:3847
+```
+
+## Web Interface
+
+Don't like terminals? Run `gg-deploy ui` and you get a clean web interface:
+
+1. Enter your domain
+2. Enter your GitHub repo
+3. Click Deploy
+4. Watch the progress in real-time
+
+Same functionality as the CLI, but clickable.
+
 ## Claude Code / MCP Integration
 
 This tool works as an MCP server, so Claude Code can deploy sites directly.
