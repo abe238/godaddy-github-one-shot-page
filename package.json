@@ -1,0 +1,49 @@
+{
+  "name": "godaddy-github-one-shot-page",
+  "version": "0.1.0",
+  "description": "AI-native CLI for GoDaddy + GitHub Pages one-shot deployment. Human-friendly. Agent-native.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "gg-deploy": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "cli",
+    "godaddy",
+    "github-pages",
+    "dns",
+    "automation",
+    "ai-native",
+    "mcp"
+  ],
+  "author": "Abe Diaz",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abe238/godaddy-github-one-shot-page.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "ora": "^8.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "eslint": "^9.17.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
