@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import { planCommand } from './commands/plan.js';
 import { applyCommand } from './commands/apply.js';
 import { statusCommand } from './commands/status.js';
+import { startMcpServer } from './mcp-server.js';
 import type { OutputFormat } from './types.js';
 
 const program = new Command();
@@ -112,6 +113,13 @@ program
       },
     };
     console.log(JSON.stringify(description, null, 2));
+  });
+
+program
+  .command('mcp-serve')
+  .description('Start MCP server for Claude Desktop/Code integration')
+  .action(async () => {
+    await startMcpServer();
   });
 
 program.parse();
