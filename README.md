@@ -25,7 +25,7 @@ npx gg-deploy status example.com user/repo  # Health check
 ## Requirements
 
 - **Node.js 18+** — Check with `node --version`
-- **GoDaddy account** with API access enabled
+- **GoDaddy account** with **10+ domains** (API access requirement)
 - **GitHub account** with a Personal Access Token
 - **Domain on GoDaddy** you want to point to GitHub Pages
 - **GitHub repo** with your site content (index.html or built site)
@@ -166,6 +166,7 @@ Then tell Claude: "Deploy example.com using user/repo"
 | `403 Forbidden` | API key is for OTE (test). Create a **Production** key |
 | `404 Not Found` | Domain not in your GoDaddy account |
 | `422 Invalid` | Domain locked or has pending transfers |
+| `403 Access denied` | Account needs **10+ domains** for API. Use Cloudflare (coming soon) |
 | Red status dot | Hover for error. Usually auth issue |
 
 ### GitHub API Issues
@@ -237,7 +238,7 @@ Total time: ~60 seconds. DNS propagation: 10-60 minutes.
 
 ## Limitations
 
-- GoDaddy only (no Cloudflare/Namecheap yet)
+- GoDaddy only (10+ domains required for API; Cloudflare/Namecheap coming)
 - Public repos or GitHub Pro required for Pages
 - Only www subdomain supported
 - One domain per deployment
