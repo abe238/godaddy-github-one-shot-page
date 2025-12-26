@@ -1,9 +1,10 @@
 import { homedir } from 'os';
 import { join } from 'path';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { execSync } from 'child_process';
 import chalk from 'chalk';
 
-const CURRENT_VERSION = '1.1.0';
+const CURRENT_VERSION = '1.1.1';
 const GITHUB_REPO = 'abe238/gg-deploy';
 const CACHE_DIR = join(homedir(), '.gg-deploy');
 const CACHE_FILE = join(CACHE_DIR, 'update-cache.json');
@@ -127,28 +128,28 @@ function writeCache(cache: UpdateCache): void {
   }
 }
 
+function fetchWithCurl(url: string): string | null {
+  try {
+    const result = execSync(
+      `curl -sL -H "Accept: application/vnd.github.v3+json" -H "User-Agent: gg-deploy/${CURRENT_VERSION}" "${url}"`,
+      { timeout: 5000, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+    );
+    return result;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchLatestRelease(): Promise<{ version: string; url: string; notes: string | null } | null> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000); // 3s timeout
+    const data = fetchWithCurl(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+    if (!data) return null;
 
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
-      signal: controller.signal,
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': `gg-deploy/${CURRENT_VERSION}`
-      }
-    });
-
-    clearTimeout(timeout);
-
-    if (!res.ok) return null;
-
-    const data = await res.json() as { tag_name: string; html_url: string; body: string };
+    const json = JSON.parse(data) as { tag_name: string; html_url: string; body: string };
     return {
-      version: data.tag_name.replace(/^v/, ''),
-      url: data.html_url,
-      notes: data.body?.split('\n').slice(0, 3).join('\n') || null
+      version: json.tag_name.replace(/^v/, ''),
+      url: json.html_url,
+      notes: json.body?.split('\n').slice(0, 3).join('\n') || null
     };
   } catch {
     return null;

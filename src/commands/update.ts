@@ -1,5 +1,4 @@
 import chalk from 'chalk';
-import ora from 'ora';
 import {
   checkForUpdates,
   CURRENT_VERSION,
@@ -11,11 +10,19 @@ import {
 export async function updateCommand(): Promise<void> {
   console.log(chalk.bold('\n🔍 Checking for updates...\n'));
 
-  const spinner = ora('Fetching latest version info...').start();
+  const isBinary = detectSurfaceType() === 'binary';
+  let spinner: { start: () => void; stop: () => void; fail: (msg: string) => void } | null = null;
+
+  if (!isBinary) {
+    const ora = await import('ora');
+    spinner = ora.default('Fetching latest version info...').start();
+  } else {
+    console.log('- Fetching latest version info...');
+  }
 
   try {
     const update = await checkForUpdates();
-    spinner.stop();
+    spinner?.stop();
 
     const surface = detectSurfaceType();
     const { os, arch } = getPlatformInfo();
@@ -97,7 +104,11 @@ export async function updateCommand(): Promise<void> {
     }
 
   } catch (error) {
-    spinner.fail('Failed to check for updates');
+    if (spinner) {
+      spinner.fail('Failed to check for updates');
+    } else {
+      console.log(chalk.red('✗ Failed to check for updates'));
+    }
     console.log(chalk.red('Error: Could not connect to GitHub API'));
     console.log(chalk.gray('Check your internet connection and try again.'));
     console.log('');

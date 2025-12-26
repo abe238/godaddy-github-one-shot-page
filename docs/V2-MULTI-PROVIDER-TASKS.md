@@ -1,7 +1,7 @@
 # gg-deploy v2.0: Multi-Provider DNS Support
 
 **Target Release:** v2.0.0
-**Total Tasks:** 38
+**Total Tasks:** 39
 **Estimated Effort:** 18-21 hours
 
 ---
@@ -267,8 +267,11 @@
 - [ ] Add `npm run test:integration` script
 - [ ] Skip in CI without credentials
 
-### 6.6 Version bump and release
-- [ ] Update `package.json` version to `2.0.0`
+### 6.6 Fix describe command version
+- [ ] Update `cli.ts` describe command to use `CURRENT_VERSION` instead of hardcoded `'0.1.0'`
+
+### 6.7 Version bump and release
+- [ ] Update `package.json` version from `1.1.x` to `2.0.0`
 - [ ] Run full test suite
 - [ ] Build and verify package
 - [ ] Create git tag `v2.0.0`

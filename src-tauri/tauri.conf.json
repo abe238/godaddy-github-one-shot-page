@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "GG Deploy",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "identifier": "ai.abediaz.gg-deploy",
   "build": {
     "frontendDist": "../ui/dist",
