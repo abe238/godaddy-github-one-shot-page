@@ -602,47 +602,6 @@
       color: var(--cyan-glow);
     }
 
-    /* Scroll Indicator */
-    .scroll-indicator {
-      position: absolute;
-      bottom: 2rem;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.5rem;
-      color: var(--text-dim);
-      font-size: 0.8rem;
-      animation: fade-up 0.8s ease-out 0.8s both;
-    }
-
-    .scroll-indicator .mouse {
-      width: 24px;
-      height: 38px;
-      border: 2px solid var(--text-dim);
-      border-radius: 12px;
-      position: relative;
-    }
-
-    .scroll-indicator .mouse::after {
-      content: '';
-      position: absolute;
-      top: 8px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 4px;
-      height: 8px;
-      background: var(--cyan-glow);
-      border-radius: 2px;
-      animation: scroll-wheel 2s infinite;
-    }
-
-    @keyframes scroll-wheel {
-      0% { opacity: 1; transform: translateX(-50%) translateY(0); }
-      100% { opacity: 0; transform: translateX(-50%) translateY(12px); }
-    }
-
     /* Features Section */
     .features {
       padding: 8rem 2rem;
@@ -1259,10 +1218,6 @@
         </a>
       </div>
 
-      <div class="scroll-indicator">
-        <div class="mouse"></div>
-        <span>Scroll to explore</span>
-      </div>
     </section>
 
     <!-- Features Section -->
