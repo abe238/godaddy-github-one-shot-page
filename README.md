@@ -383,7 +383,7 @@ AGPL-3.0 — Free to use, modify, and distribute. Forks must remain open source.
 
 ## About the Builder
 
-Hola. I'm **[Abe Diaz](https://abediaz.ai)**. By day, I'm Sr. Manager of Disaster Relief at Amazon, leading a team that uses AI and logistics to deliver 26+ million relief items across 200+ disasters worldwide. On weekends, I build artisanal developer tools like this :-P
+Hola. I'm **[Abe Diaz](https://abediaz.ai)**. By day, I'm Sr. Manager of Disaster Relief at Amazon, leading a team that uses AI and logistics to deliver 26+ million relief items and response technology across 200+ disasters worldwide. On weekends, I build artisanal developer tools like this :-P
 
 - 💼 [linkedin.com/in/abediaz](https://linkedin.com/in/abediaz)
 - 🌐 [abediaz.ai](https://abediaz.ai)
