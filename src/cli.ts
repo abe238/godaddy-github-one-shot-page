@@ -64,8 +64,8 @@ program
   .action(() => {
     const description = {
       name: 'gg-deploy',
-      version: '0.1.0',
-      description: 'Deploy any domain to GitHub Pages in one command',
+      version: CURRENT_VERSION,
+      description: 'Deploy any domain to GitHub Pages in one command. Supports GoDaddy, Cloudflare, and Namecheap DNS providers.',
       commands: [
         {
           name: 'plan',

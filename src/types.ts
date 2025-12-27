@@ -1,5 +1,35 @@
 export type OutputFormat = 'human' | 'json';
 
+export type ProviderName = 'godaddy' | 'cloudflare' | 'namecheap';
+
+export interface DomainInfo {
+  domain: string;
+  status: string;
+}
+
+export interface DNSProvider {
+  readonly name: ProviderName;
+  listDomains(): Promise<DomainInfo[]>;
+  getDNSRecords(domain: string): Promise<DNSRecord[]>;
+  setGitHubPagesRecords(domain: string, githubUser: string): Promise<void>;
+  verifyDomain(domain: string): Promise<boolean>;
+}
+
+export type DNSProviderErrorCode = 'AUTH_ERROR' | 'DOMAIN_NOT_FOUND' | 'RATE_LIMITED' | 'VALIDATION_ERROR' | 'NETWORK_ERROR';
+
+export class DNSProviderError extends Error {
+  constructor(
+    public provider: ProviderName,
+    public code: DNSProviderErrorCode,
+    public humanMessage: string,
+    public suggestion?: string,
+    public retriable: boolean = false
+  ) {
+    super(`[${provider.toUpperCase()}] ${humanMessage}`);
+    this.name = 'DNSProviderError';
+  }
+}
+
 export interface CommandResult {
   status: 'success' | 'partial_success' | 'failure';
   completed_steps: string[];

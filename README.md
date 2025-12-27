@@ -25,10 +25,18 @@ npx gg-deploy status example.com user/repo  # Health check
 ## Requirements
 
 - **Node.js 18+** — Check with `node --version`
-- **GoDaddy account** with **10+ domains** (API access requirement)
+- **DNS Provider account** — GoDaddy, Cloudflare, or Namecheap
 - **GitHub account** with a Personal Access Token
-- **Domain on GoDaddy** you want to point to GitHub Pages
+- **Domain** managed by your DNS provider
 - **GitHub repo** with your site content (index.html or built site)
+
+### Provider Comparison
+
+| Provider | Ease of Setup | API Access | Notes |
+|----------|---------------|------------|-------|
+| **Cloudflare** | Easy | Free for all | Recommended for new users |
+| **GoDaddy** | Medium | Requires 10+ domains | Production key required |
+| **Namecheap** | Medium | Requires IP whitelist | Must whitelist your IP |
 
 ## Setup
 
@@ -47,9 +55,25 @@ The setup wizard walks you through:
 
 ### Option 2: Manual Config
 
-Create `~/.gg-deploy/config.json`:
+Create `~/.gg-deploy/config.json` with your preferred DNS provider:
+
+**Cloudflare (Recommended):**
 ```json
 {
+  "dnsProvider": "cloudflare",
+  "cloudflare": {
+    "apiToken": "YOUR_CLOUDFLARE_TOKEN"
+  },
+  "github": {
+    "token": "ghp_YOUR_TOKEN"
+  }
+}
+```
+
+**GoDaddy:**
+```json
+{
+  "dnsProvider": "godaddy",
   "godaddy": {
     "apiKey": "YOUR_KEY",
     "apiSecret": "YOUR_SECRET",
@@ -61,13 +85,43 @@ Create `~/.gg-deploy/config.json`:
 }
 ```
 
+**Namecheap:**
+```json
+{
+  "dnsProvider": "namecheap",
+  "namecheap": {
+    "apiUser": "YOUR_USERNAME",
+    "apiKey": "YOUR_API_KEY",
+    "clientIP": "YOUR_IP_ADDRESS"
+  },
+  "github": {
+    "token": "ghp_YOUR_TOKEN"
+  }
+}
+```
+
 ### Getting Credentials
+
+**Cloudflare API Token (Recommended):**
+1. Go to https://dash.cloudflare.com/profile/api-tokens
+2. Click "Create Token"
+3. Use "Edit zone DNS" template
+4. Select the zone (domain) you want to manage
+5. Copy the token
 
 **GoDaddy API Key:**
 1. Go to https://developer.godaddy.com/keys
 2. Click "Create New API Key"
 3. Select **Production** (not OTE/Test)
 4. Copy Key and Secret immediately (secret shown only once)
+5. Note: Requires account with **10+ domains**
+
+**Namecheap API:**
+1. Go to https://ap.www.namecheap.com/settings/tools/apiaccess/
+2. Enable API access
+3. **Whitelist your IP address** (required)
+4. Copy API Key and Username
+5. Get your current IP: `curl ifconfig.me`
 
 **GitHub Token:**
 1. Go to https://github.com/settings/tokens/new?description=gg-deploy&scopes=repo
@@ -166,8 +220,27 @@ Then tell Claude: "Deploy example.com using user/repo"
 | `403 Forbidden` | API key is for OTE (test). Create a **Production** key |
 | `404 Not Found` | Domain not in your GoDaddy account |
 | `422 Invalid` | Domain locked or has pending transfers |
-| `403 Access denied` | Account needs **10+ domains** for API. Use Cloudflare (coming soon) |
+| `403 Access denied` | Account needs **10+ domains** for API. Use Cloudflare instead |
 | Red status dot | Hover for error. Usually auth issue |
+
+### Cloudflare API Issues
+
+| Problem | Solution |
+|---------|----------|
+| `401 Unauthorized` | Invalid API token. Regenerate at dash.cloudflare.com |
+| `403 Forbidden` | Token doesn't have Edit DNS permission. Create new token |
+| Zone not found | Domain not in your Cloudflare account or wrong zone |
+| Records not applying | Ensure `proxied: false` for GitHub Pages (handled automatically) |
+
+### Namecheap API Issues
+
+| Problem | Solution |
+|---------|----------|
+| `1011150 IP not whitelisted` | Add your IP at ap.www.namecheap.com/settings/tools/apiaccess |
+| `500000 Rate limited` | Wait a few minutes, API has rate limits |
+| Authentication failed | Check apiUser and apiKey are correct |
+| Domain not found | Domain must be active in your Namecheap account |
+| Records overwritten | Namecheap API replaces ALL records. Backup is created automatically |
 
 ### GitHub API Issues
 
@@ -238,7 +311,9 @@ Total time: ~60 seconds. DNS propagation: 10-60 minutes.
 
 ## Limitations
 
-- GoDaddy only (10+ domains required for API; Cloudflare/Namecheap coming)
+- Supports GoDaddy, Cloudflare, and Namecheap (other providers coming)
+- GoDaddy requires 10+ domains for API access
+- Namecheap requires IP whitelist configuration
 - Public repos or GitHub Pro required for Pages
 - Only www subdomain supported
 - One domain per deployment

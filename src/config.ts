@@ -2,10 +2,22 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'f
 import { join } from 'path';
 import { homedir } from 'os';
 
+import type { ProviderName } from './types.js';
+
 export interface GoDaddyConfig {
   apiKey: string;
   apiSecret: string;
   environment: 'production' | 'ote';
+}
+
+export interface CloudflareConfig {
+  apiToken: string;
+}
+
+export interface NamecheapConfig {
+  apiUser: string;
+  apiKey: string;
+  clientIP: string;
 }
 
 export interface GitHubConfig {
@@ -13,7 +25,10 @@ export interface GitHubConfig {
 }
 
 export interface AppConfig {
+  dnsProvider?: ProviderName;
   godaddy?: GoDaddyConfig;
+  cloudflare?: CloudflareConfig;
+  namecheap?: NamecheapConfig;
   github?: GitHubConfig;
 }
 
@@ -78,6 +93,32 @@ export function getGitHubConfig(): GitHubConfig | null {
   return null;
 }
 
+export function getCloudflareConfig(): CloudflareConfig | null {
+  const config = readConfig();
+  if (config.cloudflare?.apiToken) {
+    return config.cloudflare;
+  }
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+  if (apiToken) {
+    return { apiToken };
+  }
+  return null;
+}
+
+export function getNamecheapConfig(): NamecheapConfig | null {
+  const config = readConfig();
+  if (config.namecheap?.apiUser && config.namecheap?.apiKey && config.namecheap?.clientIP) {
+    return config.namecheap;
+  }
+  const apiUser = process.env.NAMECHEAP_API_USER;
+  const apiKey = process.env.NAMECHEAP_API_KEY;
+  const clientIP = process.env.NAMECHEAP_CLIENT_IP;
+  if (apiUser && apiKey && clientIP) {
+    return { apiUser, apiKey, clientIP };
+  }
+  return null;
+}
+
 export function saveGoDaddyConfig(apiKey: string, apiSecret: string, environment: 'production' | 'ote' = 'production'): void {
   const config = readConfig();
   config.godaddy = { apiKey, apiSecret, environment };
@@ -87,6 +128,18 @@ export function saveGoDaddyConfig(apiKey: string, apiSecret: string, environment
 export function saveGitHubConfig(token: string): void {
   const config = readConfig();
   config.github = { token };
+  writeConfig(config);
+}
+
+export function saveCloudflareConfig(apiToken: string): void {
+  const config = readConfig();
+  config.cloudflare = { apiToken };
+  writeConfig(config);
+}
+
+export function saveNamecheapConfig(apiUser: string, apiKey: string, clientIP: string): void {
+  const config = readConfig();
+  config.namecheap = { apiUser, apiKey, clientIP };
   writeConfig(config);
 }
 

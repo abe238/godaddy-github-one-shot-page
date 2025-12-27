@@ -1,7 +1,8 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import type { OutputFormat, CommandResult } from '../types.js';
-import { GoDaddyService } from '../services/godaddy.js';
+import { DNSProviderError } from '../types.js';
+import { DNSProviderFactory } from '../services/dns-factory.js';
 import { GitHubService } from '../services/github.js';
 
 export async function applyCommand(
@@ -24,15 +25,16 @@ export async function applyCommand(
   const log = (msg: string) => output === 'human' && console.log(msg);
 
   try {
-    const godaddy = new GoDaddyService();
+    const dns = DNSProviderFactory.create();
     const github = new GitHubService();
     const githubUser = repo.split('/')[0];
 
     log(chalk.blue('\n=== Deploying ===\n'));
+    log(chalk.dim(`Provider: ${dns.name}\n`));
 
     spinner?.start('Verifying domain ownership...');
-    const domainExists = await godaddy.verifyDomain(domain);
-    if (!domainExists) throw new Error(`Domain ${domain} not in GoDaddy account`);
+    const domainExists = await dns.verifyDomain(domain);
+    if (!domainExists) throw new Error(`Domain ${domain} not found in ${dns.name} account`);
     spinner?.succeed('Domain verified');
     result.completed_steps.push('verify_domain');
 
@@ -42,8 +44,8 @@ export async function applyCommand(
     spinner?.succeed('Repository verified');
     result.completed_steps.push('verify_repo');
 
-    spinner?.start('Configuring DNS A records...');
-    await godaddy.setGitHubPagesRecords(domain, githubUser);
+    spinner?.start('Configuring DNS records...');
+    await dns.setGitHubPagesRecords(domain, githubUser);
     spinner?.succeed('DNS records configured');
     result.completed_steps.push('configure_dns');
     result.resources_created.push(`A records for ${domain}`);
@@ -81,11 +83,17 @@ export async function applyCommand(
   } catch (e) {
     spinner?.fail('Deployment failed');
     result.status = result.completed_steps.length > 0 ? 'partial_success' : 'failure';
+    const isRetriable = e instanceof DNSProviderError ? e.retriable : true;
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    const suggestion = e instanceof DNSProviderError ? e.suggestion : undefined;
     result.failed_steps.push({
       step: 'apply',
-      error: e instanceof Error ? e.message : String(e),
-      retriable: true,
+      error: suggestion ? `${errorMsg} (${suggestion})` : errorMsg,
+      retriable: isRetriable,
     });
+    if (output === 'human' && suggestion) {
+      console.log(chalk.yellow(`\nSuggestion: ${suggestion}`));
+    }
   }
 
   if (output === 'json') {

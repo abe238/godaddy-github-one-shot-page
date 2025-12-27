@@ -9,9 +9,10 @@ import {
 import { planCommand } from './commands/plan.js';
 import { applyCommand } from './commands/apply.js';
 import { statusCommand } from './commands/status.js';
+import { CURRENT_VERSION } from './lib/update-checker.js';
 
 const server = new Server(
-  { name: 'gg-deploy', version: '0.1.0' },
+  { name: 'gg-deploy', version: CURRENT_VERSION },
   { capabilities: { tools: {} } }
 );
 
@@ -19,7 +20,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: 'deploy_site_plan',
-      description: 'Preview GoDaddy DNS + GitHub Pages deployment without making changes. Safe to call anytime.',
+      description: 'Preview DNS + GitHub Pages deployment without making changes. Supports GoDaddy, Cloudflare, and Namecheap. Safe to call anytime.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -31,7 +32,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'deploy_site_apply',
-      description: 'Execute GoDaddy DNS + GitHub Pages deployment. Configures DNS A records, CNAME, and enables GitHub Pages with custom domain.',
+      description: 'Execute DNS + GitHub Pages deployment. Configures DNS A records, CNAME, and enables GitHub Pages with custom domain. Supports GoDaddy, Cloudflare, and Namecheap.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -43,7 +44,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'deploy_site_status',
-      description: 'Check deployment health: DNS configuration, GitHub Pages status, SSL certificate state. Safe to call anytime.',
+      description: 'Check deployment health: DNS configuration, GitHub Pages status, SSL certificate state. Supports GoDaddy, Cloudflare, and Namecheap. Safe to call anytime.',
       inputSchema: {
         type: 'object',
         properties: {

@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import type { OutputFormat, StatusResult, CommandResult } from '../types.js';
-import { GoDaddyService } from '../services/godaddy.js';
+import { DNSProviderError } from '../types.js';
+import { DNSProviderFactory } from '../services/dns-factory.js';
 import { GitHubService } from '../services/github.js';
 
 export async function statusCommand(
@@ -30,10 +31,10 @@ export async function statusCommand(
   };
 
   try {
-    const godaddy = new GoDaddyService();
+    const dns = DNSProviderFactory.create();
     const github = new GitHubService();
 
-    const records = await godaddy.getDNSRecords(domain);
+    const records = await dns.getDNSRecords(domain);
     status.dns_records = records.filter(
       (r) => r.type === 'A' || (r.type === 'CNAME' && r.name === 'www')
     );
@@ -62,8 +63,9 @@ export async function statusCommand(
 
     if (output === 'human') {
       console.log(chalk.blue('\n=== Status ===\n'));
-      console.log(`Domain: ${chalk.cyan(domain)}`);
-      console.log(`Repo:   ${chalk.cyan(repo)}\n`);
+      console.log(`Domain:   ${chalk.cyan(domain)}`);
+      console.log(`Repo:     ${chalk.cyan(repo)}`);
+      console.log(`Provider: ${chalk.cyan(dns.name)}\n`);
 
       const dnsIcon = status.dns_configured ? chalk.green('OK') : chalk.red('X');
       const ghIcon = status.github_pages_enabled ? chalk.green('OK') : chalk.red('X');
@@ -87,11 +89,17 @@ export async function statusCommand(
     }
   } catch (e) {
     result.status = 'failure';
+    const isRetriable = e instanceof DNSProviderError ? e.retriable : true;
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    const suggestion = e instanceof DNSProviderError ? e.suggestion : undefined;
     result.failed_steps.push({
       step: 'status',
-      error: e instanceof Error ? e.message : String(e),
-      retriable: true,
+      error: suggestion ? `${errorMsg} (${suggestion})` : errorMsg,
+      retriable: isRetriable,
     });
+    if (output === 'human' && suggestion) {
+      console.log(chalk.yellow(`\nSuggestion: ${suggestion}`));
+    }
   }
 
   return result;

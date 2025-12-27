@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import type { OutputFormat, PlanResult, CommandResult } from '../types.js';
-import { GoDaddyService } from '../services/godaddy.js';
+import { DNSProviderError } from '../types.js';
+import { DNSProviderFactory } from '../services/dns-factory.js';
 import { GitHubService } from '../services/github.js';
 
 export async function planCommand(
@@ -28,21 +29,22 @@ export async function planCommand(
   };
 
   try {
-    const godaddy = new GoDaddyService();
+    const dns = DNSProviderFactory.create();
     const github = new GitHubService();
 
     if (output === 'human') {
       console.log(chalk.blue('\n=== Deployment Plan ===\n'));
-      console.log(`Domain: ${chalk.cyan(domain)}`);
-      console.log(`Repo:   ${chalk.cyan(repo)}\n`);
+      console.log(`Domain:   ${chalk.cyan(domain)}`);
+      console.log(`Repo:     ${chalk.cyan(repo)}`);
+      console.log(`Provider: ${chalk.cyan(dns.name)}\n`);
     }
 
-    const domainExists = await godaddy.verifyDomain(domain);
+    const domainExists = await dns.verifyDomain(domain);
     if (!domainExists) {
       result.status = 'failure';
       result.failed_steps.push({
         step: 'verify_domain',
-        error: `Domain ${domain} not found or not active in GoDaddy`,
+        error: `Domain ${domain} not found or not active in ${dns.name}`,
         retriable: false,
       });
       return result;
@@ -108,11 +110,17 @@ export async function planCommand(
     result.estimated_wait_seconds = 300;
   } catch (e) {
     result.status = 'failure';
+    const isRetriable = e instanceof DNSProviderError ? e.retriable : true;
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    const suggestion = e instanceof DNSProviderError ? e.suggestion : undefined;
     result.failed_steps.push({
       step: 'plan',
-      error: e instanceof Error ? e.message : String(e),
-      retriable: true,
+      error: suggestion ? `${errorMsg} (${suggestion})` : errorMsg,
+      retriable: isRetriable,
     });
+    if (output === 'human' && suggestion) {
+      console.log(chalk.yellow(`\nSuggestion: ${suggestion}`));
+    }
   }
 
   return result;

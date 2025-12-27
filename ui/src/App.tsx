@@ -2,18 +2,27 @@ import { useState, useEffect } from 'react'
 import { check, Update } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 
+type DNSProvider = 'godaddy' | 'cloudflare' | 'namecheap'
+
 type AuthStatus = {
   godaddy: { configured: boolean; keyPreview?: string }
+  cloudflare: { configured: boolean; tokenPreview?: string }
+  namecheap: { configured: boolean; userPreview?: string }
   github: { configured: boolean; tokenPreview?: string }
 }
 
 type ConnectionStatus = {
   godaddy: { configured: boolean; verified: boolean; error: string | null }
+  cloudflare: { configured: boolean; verified: boolean; error: string | null }
+  namecheap: { configured: boolean; verified: boolean; error: string | null }
   github: { configured: boolean; verified: boolean; error: string | null; user: string | null }
 }
 
 type SavedConfig = {
+  dnsProvider: DNSProvider | null
   godaddy: { apiKey: string; apiSecret: string } | null
+  cloudflare: { apiToken: string } | null
+  namecheap: { apiUser: string; apiKey: string; clientIP: string } | null
   github: { token: string } | null
 }
 
@@ -27,7 +36,15 @@ type DeployStep = {
 type AppState = 'loading' | 'setup' | 'ready' | 'deploying' | 'success' | 'error'
 
 const GODADDY_KEY_URL = 'https://developer.godaddy.com/keys'
+const CLOUDFLARE_TOKEN_URL = 'https://dash.cloudflare.com/profile/api-tokens'
+const NAMECHEAP_API_URL = 'https://ap.www.namecheap.com/settings/tools/apiaccess/'
 const GITHUB_TOKEN_URL = 'https://github.com/settings/tokens/new?description=gg-deploy&scopes=repo'
+
+const DNS_PROVIDERS: { value: DNSProvider; label: string; description: string }[] = [
+  { value: 'godaddy', label: 'GoDaddy', description: 'For domains registered with GoDaddy' },
+  { value: 'cloudflare', label: 'Cloudflare', description: 'For domains using Cloudflare DNS' },
+  { value: 'namecheap', label: 'Namecheap', description: 'For domains registered with Namecheap' },
+]
 
 const CheckIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -113,12 +130,19 @@ function App() {
   const [updateProgress, setUpdateProgress] = useState<string>('')
 
   // Setup form
+  const [dnsProvider, setDnsProvider] = useState<DNSProvider>('godaddy')
   const [gdKey, setGdKey] = useState('')
   const [gdSecret, setGdSecret] = useState('')
+  const [cfToken, setCfToken] = useState('')
+  const [ncUser, setNcUser] = useState('')
+  const [ncKey, setNcKey] = useState('')
+  const [ncIP, setNcIP] = useState('')
   const [ghToken, setGhToken] = useState('')
   const [saving, setSaving] = useState(false)
   const [showGdKey, setShowGdKey] = useState(false)
   const [showGdSecret, setShowGdSecret] = useState(false)
+  const [showCfToken, setShowCfToken] = useState(false)
+  const [showNcKey, setShowNcKey] = useState(false)
   const [showGhToken, setShowGhToken] = useState(false)
 
   // Deploy form
@@ -170,7 +194,8 @@ function App() {
       const res = await fetch('/api/auth-status')
       const status: AuthStatus = await res.json()
       setAuthStatus(status)
-      const isReady = status.godaddy.configured && status.github.configured
+      const dnsConfigured = status.godaddy?.configured || status.cloudflare?.configured || status.namecheap?.configured
+      const isReady = dnsConfigured && status.github.configured
       setState(isReady ? 'ready' : 'setup')
       if (isReady) {
         testConnection()
@@ -198,9 +223,20 @@ function App() {
       const res = await fetch('/api/config/values')
       const config: SavedConfig = await res.json()
       // Pre-fill inputs with saved values
+      if (config.dnsProvider) {
+        setDnsProvider(config.dnsProvider)
+      }
       if (config.godaddy) {
         setGdKey(config.godaddy.apiKey)
         setGdSecret(config.godaddy.apiSecret)
+      }
+      if (config.cloudflare) {
+        setCfToken(config.cloudflare.apiToken)
+      }
+      if (config.namecheap) {
+        setNcUser(config.namecheap.apiUser)
+        setNcKey(config.namecheap.apiKey)
+        setNcIP(config.namecheap.clientIP)
       }
       if (config.github) {
         setGhToken(config.github.token)
@@ -221,26 +257,33 @@ function App() {
     // Reset visibility toggles
     setShowGdKey(false)
     setShowGdSecret(false)
+    setShowCfToken(false)
+    setShowNcKey(false)
     setShowGhToken(false)
     // Clear inputs
     setGdKey('')
     setGdSecret('')
+    setCfToken('')
+    setNcUser('')
+    setNcKey('')
+    setNcIP('')
     setGhToken('')
   }
 
-  const getStatusClass = (service: 'godaddy' | 'github'): string => {
+  const getStatusClass = (service: 'godaddy' | 'cloudflare' | 'namecheap' | 'github'): string => {
     if (testing) return 'testing'
     if (!connectionStatus) return ''
     const status = connectionStatus[service]
-    if (status.verified) return 'connected'
-    if (status.error) return 'error'
+    if (status?.verified) return 'connected'
+    if (status?.error) return 'error'
     return ''
   }
 
-  const getStatusTooltip = (service: 'godaddy' | 'github'): string => {
+  const getStatusTooltip = (service: 'godaddy' | 'cloudflare' | 'namecheap' | 'github'): string => {
     if (testing) return 'Testing connection...'
     if (!connectionStatus) return 'Click refresh to test connection'
     const status = connectionStatus[service]
+    if (!status) return 'Not configured'
     if (status.verified) {
       if (service === 'github' && connectionStatus.github.user) {
         return `Connected as @${connectionStatus.github.user}`
@@ -254,9 +297,15 @@ function App() {
   const saveConfig = async () => {
     setSaving(true)
     try {
-      const payload: Record<string, unknown> = {}
-      if (gdKey && gdSecret) {
+      const payload: Record<string, unknown> = { dnsProvider }
+      if (dnsProvider === 'godaddy' && gdKey && gdSecret) {
         payload.godaddy = { apiKey: gdKey, apiSecret: gdSecret, environment: 'production' }
+      }
+      if (dnsProvider === 'cloudflare' && cfToken) {
+        payload.cloudflare = { apiToken: cfToken }
+      }
+      if (dnsProvider === 'namecheap' && ncUser && ncKey && ncIP) {
+        payload.namecheap = { apiUser: ncUser, apiKey: ncKey, clientIP: ncIP }
       }
       if (ghToken) {
         payload.github = { token: ghToken }
@@ -271,10 +320,16 @@ function App() {
       // Reset visibility toggles
       setShowGdKey(false)
       setShowGdSecret(false)
+      setShowCfToken(false)
+      setShowNcKey(false)
       setShowGhToken(false)
       // Clear inputs
       setGdKey('')
       setGdSecret('')
+      setCfToken('')
+      setNcUser('')
+      setNcKey('')
+      setNcIP('')
       setGhToken('')
       await checkAuth()
       testConnection()
@@ -428,8 +483,16 @@ function App() {
 
   // Setup state (first time or settings)
   if (state === 'setup' || showSettings) {
-    const needsGodaddy = !authStatus?.godaddy.configured
+    const dnsConfigured = authStatus?.godaddy?.configured || authStatus?.cloudflare?.configured || authStatus?.namecheap?.configured
+    const needsDns = !dnsConfigured
     const needsGithub = !authStatus?.github.configured
+
+    const isDnsValid = () => {
+      if (dnsProvider === 'godaddy') return gdKey && gdSecret
+      if (dnsProvider === 'cloudflare') return cfToken
+      if (dnsProvider === 'namecheap') return ncUser && ncKey && ncIP
+      return false
+    }
 
     return (
       <div className="container">
@@ -445,69 +508,161 @@ function App() {
           <div className="setup-section">
             <div className="setup-header">
               <div className="setup-number">1</div>
-              <div className="setup-title">GoDaddy API</div>
-              {authStatus?.godaddy.configured && (
+              <div className="setup-title">DNS Provider</div>
+              {dnsConfigured && (
                 <span className="setup-check"><CheckIcon /></span>
               )}
             </div>
 
-            {(needsGodaddy || showSettings) && (
+            {(needsDns || showSettings) && (
               <>
                 <p className="setup-desc">
-                  Create an API key at GoDaddy Developer Portal
+                  Select your DNS provider and enter API credentials
                 </p>
-                <a href={GODADDY_KEY_URL} target="_blank" rel="noopener" className="external-link">
-                  Get API Key <ArrowIcon />
-                </a>
 
                 <div className="field">
-                  <div className="input-with-toggle">
-                    <input
-                      type={showGdKey ? 'text' : 'password'}
-                      className="input mono"
-                      placeholder="API Key"
-                      value={gdKey}
-                      onChange={e => setGdKey(e.target.value)}
-                    />
-                    {gdKey && (
-                      <button
-                        type="button"
-                        className="eye-toggle"
-                        onClick={() => setShowGdKey(!showGdKey)}
-                        title={showGdKey ? 'Hide value' : 'Show value'}
-                      >
-                        {showGdKey ? <EyeOffIcon /> : <EyeIcon />}
-                      </button>
-                    )}
-                  </div>
+                  <select
+                    className="input"
+                    value={dnsProvider}
+                    onChange={e => setDnsProvider(e.target.value as DNSProvider)}
+                  >
+                    {DNS_PROVIDERS.map(p => (
+                      <option key={p.value} value={p.value}>{p.label}</option>
+                    ))}
+                  </select>
                 </div>
-                <div className="field">
-                  <div className="input-with-toggle">
-                    <input
-                      type={showGdSecret ? 'text' : 'password'}
-                      className="input mono"
-                      placeholder="API Secret"
-                      value={gdSecret}
-                      onChange={e => setGdSecret(e.target.value)}
-                    />
-                    {gdSecret && (
-                      <button
-                        type="button"
-                        className="eye-toggle"
-                        onClick={() => setShowGdSecret(!showGdSecret)}
-                        title={showGdSecret ? 'Hide value' : 'Show value'}
-                      >
-                        {showGdSecret ? <EyeOffIcon /> : <EyeIcon />}
-                      </button>
-                    )}
-                  </div>
-                </div>
+
+                {dnsProvider === 'godaddy' && (
+                  <>
+                    <a href={GODADDY_KEY_URL} target="_blank" rel="noopener" className="external-link">
+                      Get GoDaddy API Key <ArrowIcon />
+                    </a>
+                    <div className="field">
+                      <div className="input-with-toggle">
+                        <input
+                          type={showGdKey ? 'text' : 'password'}
+                          className="input mono"
+                          placeholder="API Key"
+                          value={gdKey}
+                          onChange={e => setGdKey(e.target.value)}
+                        />
+                        {gdKey && (
+                          <button
+                            type="button"
+                            className="eye-toggle"
+                            onClick={() => setShowGdKey(!showGdKey)}
+                            title={showGdKey ? 'Hide value' : 'Show value'}
+                          >
+                            {showGdKey ? <EyeOffIcon /> : <EyeIcon />}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="field">
+                      <div className="input-with-toggle">
+                        <input
+                          type={showGdSecret ? 'text' : 'password'}
+                          className="input mono"
+                          placeholder="API Secret"
+                          value={gdSecret}
+                          onChange={e => setGdSecret(e.target.value)}
+                        />
+                        {gdSecret && (
+                          <button
+                            type="button"
+                            className="eye-toggle"
+                            onClick={() => setShowGdSecret(!showGdSecret)}
+                            title={showGdSecret ? 'Hide value' : 'Show value'}
+                          >
+                            {showGdSecret ? <EyeOffIcon /> : <EyeIcon />}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {dnsProvider === 'cloudflare' && (
+                  <>
+                    <a href={CLOUDFLARE_TOKEN_URL} target="_blank" rel="noopener" className="external-link">
+                      Get Cloudflare API Token <ArrowIcon />
+                    </a>
+                    <div className="field">
+                      <div className="input-with-toggle">
+                        <input
+                          type={showCfToken ? 'text' : 'password'}
+                          className="input mono"
+                          placeholder="API Token"
+                          value={cfToken}
+                          onChange={e => setCfToken(e.target.value)}
+                        />
+                        {cfToken && (
+                          <button
+                            type="button"
+                            className="eye-toggle"
+                            onClick={() => setShowCfToken(!showCfToken)}
+                            title={showCfToken ? 'Hide value' : 'Show value'}
+                          >
+                            {showCfToken ? <EyeOffIcon /> : <EyeIcon />}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {dnsProvider === 'namecheap' && (
+                  <>
+                    <a href={NAMECHEAP_API_URL} target="_blank" rel="noopener" className="external-link">
+                      Enable Namecheap API Access <ArrowIcon />
+                    </a>
+                    <div className="field">
+                      <input
+                        type="text"
+                        className="input mono"
+                        placeholder="API Username"
+                        value={ncUser}
+                        onChange={e => setNcUser(e.target.value)}
+                      />
+                    </div>
+                    <div className="field">
+                      <div className="input-with-toggle">
+                        <input
+                          type={showNcKey ? 'text' : 'password'}
+                          className="input mono"
+                          placeholder="API Key"
+                          value={ncKey}
+                          onChange={e => setNcKey(e.target.value)}
+                        />
+                        {ncKey && (
+                          <button
+                            type="button"
+                            className="eye-toggle"
+                            onClick={() => setShowNcKey(!showNcKey)}
+                            title={showNcKey ? 'Hide value' : 'Show value'}
+                          >
+                            {showNcKey ? <EyeOffIcon /> : <EyeIcon />}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="field">
+                      <input
+                        type="text"
+                        className="input mono"
+                        placeholder="Your IP Address (whitelist)"
+                        value={ncIP}
+                        onChange={e => setNcIP(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
               </>
             )}
 
-            {authStatus?.godaddy.configured && !showSettings && (
+            {dnsConfigured && !showSettings && (
               <p className="setup-configured">
-                Connected: {authStatus.godaddy.keyPreview}
+                Connected: {authStatus?.godaddy?.configured ? 'GoDaddy' : authStatus?.cloudflare?.configured ? 'Cloudflare' : 'Namecheap'}
               </p>
             )}
           </div>
@@ -563,15 +718,35 @@ function App() {
             )}
           </div>
 
-          {showSettings && authStatus?.godaddy.configured && authStatus?.github.configured && (
+          {showSettings && (authStatus?.godaddy?.configured || authStatus?.cloudflare?.configured || authStatus?.namecheap?.configured) && authStatus?.github.configured && (
             <div className="settings-status-row">
-              <div
-                className="status-badge"
-                data-tooltip={getStatusTooltip('godaddy')}
-              >
-                <span className={`status-dot ${getStatusClass('godaddy')}`} />
-                GoDaddy
-              </div>
+              {authStatus?.godaddy?.configured && (
+                <div
+                  className="status-badge"
+                  data-tooltip={getStatusTooltip('godaddy')}
+                >
+                  <span className={`status-dot ${getStatusClass('godaddy')}`} />
+                  GoDaddy
+                </div>
+              )}
+              {authStatus?.cloudflare?.configured && (
+                <div
+                  className="status-badge"
+                  data-tooltip={getStatusTooltip('cloudflare')}
+                >
+                  <span className={`status-dot ${getStatusClass('cloudflare')}`} />
+                  Cloudflare
+                </div>
+              )}
+              {authStatus?.namecheap?.configured && (
+                <div
+                  className="status-badge"
+                  data-tooltip={getStatusTooltip('namecheap')}
+                >
+                  <span className={`status-dot ${getStatusClass('namecheap')}`} />
+                  Namecheap
+                </div>
+              )}
               <div
                 className="status-badge"
                 data-tooltip={getStatusTooltip('github')}
@@ -596,7 +771,7 @@ function App() {
           <button
             className="btn"
             onClick={saveConfig}
-            disabled={saving || (needsGodaddy && (!gdKey || !gdSecret)) || (needsGithub && !ghToken)}
+            disabled={saving || (needsDns && !isDnsValid()) || (needsGithub && !ghToken)}
           >
             {saving ? 'Saving...' : showSettings ? 'Update Settings' : 'Save & Continue'}
           </button>
@@ -690,13 +865,33 @@ function App() {
       </div>
 
       <div className="status-row">
-        <div
-          className="status-badge"
-          data-tooltip={getStatusTooltip('godaddy')}
-        >
-          <span className={`status-dot ${getStatusClass('godaddy')}`} />
-          GoDaddy
-        </div>
+        {authStatus?.godaddy?.configured && (
+          <div
+            className="status-badge"
+            data-tooltip={getStatusTooltip('godaddy')}
+          >
+            <span className={`status-dot ${getStatusClass('godaddy')}`} />
+            GoDaddy
+          </div>
+        )}
+        {authStatus?.cloudflare?.configured && (
+          <div
+            className="status-badge"
+            data-tooltip={getStatusTooltip('cloudflare')}
+          >
+            <span className={`status-dot ${getStatusClass('cloudflare')}`} />
+            Cloudflare
+          </div>
+        )}
+        {authStatus?.namecheap?.configured && (
+          <div
+            className="status-badge"
+            data-tooltip={getStatusTooltip('namecheap')}
+          >
+            <span className={`status-dot ${getStatusClass('namecheap')}`} />
+            Namecheap
+          </div>
+        )}
         <div
           className="status-badge"
           data-tooltip={getStatusTooltip('github')}

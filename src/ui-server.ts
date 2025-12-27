@@ -9,10 +9,17 @@ import {
   getAuthStatus,
   saveGoDaddyConfig,
   saveGitHubConfig,
+  saveCloudflareConfig,
+  saveNamecheapConfig,
   getConfigPath,
   getGoDaddyConfig,
   getGitHubConfig,
+  getCloudflareConfig,
+  getNamecheapConfig,
+  readConfig,
+  writeConfig,
 } from './config.js';
+import type { ProviderName } from './types.js';
 
 function getUiDir(): string {
   // When running as pkg binary, assets are at absolute /snapshot/ path
@@ -83,11 +90,17 @@ export async function startUiServer() {
     }
 
     if (path === '/api/config/values') {
+      const config = readConfig();
       const gdConfig = getGoDaddyConfig();
       const ghConfig = getGitHubConfig();
+      const cfConfig = getCloudflareConfig();
+      const ncConfig = getNamecheapConfig();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
+        dnsProvider: config.dnsProvider || null,
         godaddy: gdConfig ? { apiKey: gdConfig.apiKey, apiSecret: gdConfig.apiSecret } : null,
+        cloudflare: cfConfig ? { apiToken: cfConfig.apiToken } : null,
+        namecheap: ncConfig ? { apiUser: ncConfig.apiUser, apiKey: ncConfig.apiKey, clientIP: ncConfig.clientIP } : null,
         github: ghConfig ? { token: ghConfig.token } : null,
       }));
       return;
@@ -96,6 +109,8 @@ export async function startUiServer() {
     if (path === '/api/test-connection') {
       const result = {
         godaddy: { configured: false, verified: false, error: null as string | null },
+        cloudflare: { configured: false, verified: false, error: null as string | null },
+        namecheap: { configured: false, verified: false, error: null as string | null },
         github: { configured: false, verified: false, error: null as string | null, user: null as string | null },
       };
 
@@ -115,6 +130,43 @@ export async function startUiServer() {
           }
         } catch (e) {
           result.godaddy.error = String(e);
+        }
+      }
+
+      const cfConfig = getCloudflareConfig();
+      if (cfConfig) {
+        result.cloudflare.configured = true;
+        try {
+          const cfRes = await fetch('https://api.cloudflare.com/client/v4/user/tokens/verify', {
+            headers: {
+              Authorization: `Bearer ${cfConfig.apiToken}`,
+            },
+          });
+          if (cfRes.ok) {
+            result.cloudflare.verified = true;
+          } else {
+            result.cloudflare.error = `API returned ${cfRes.status}`;
+          }
+        } catch (e) {
+          result.cloudflare.error = String(e);
+        }
+      }
+
+      const ncConfig = getNamecheapConfig();
+      if (ncConfig) {
+        result.namecheap.configured = true;
+        try {
+          const ncUrl = `https://api.namecheap.com/xml.response?ApiUser=${ncConfig.apiUser}&ApiKey=${ncConfig.apiKey}&UserName=${ncConfig.apiUser}&ClientIp=${ncConfig.clientIP}&Command=namecheap.domains.getList&PageSize=1`;
+          const ncRes = await fetch(ncUrl);
+          const ncXml = await ncRes.text();
+          if (ncXml.includes('Status="OK"')) {
+            result.namecheap.verified = true;
+          } else if (ncXml.includes('Status="ERROR"')) {
+            const errorMatch = ncXml.match(/<Error[^>]*>([^<]+)<\/Error>/);
+            result.namecheap.error = errorMatch ? errorMatch[1] : 'API error';
+          }
+        } catch (e) {
+          result.namecheap.error = String(e);
         }
       }
 
@@ -150,11 +202,26 @@ export async function startUiServer() {
       const data = JSON.parse(body);
 
       try {
+        if (data.dnsProvider) {
+          const config = readConfig();
+          config.dnsProvider = data.dnsProvider as ProviderName;
+          writeConfig(config);
+        }
         if (data.godaddy) {
           saveGoDaddyConfig(
             data.godaddy.apiKey,
             data.godaddy.apiSecret,
             data.godaddy.environment || 'production'
+          );
+        }
+        if (data.cloudflare) {
+          saveCloudflareConfig(data.cloudflare.apiToken);
+        }
+        if (data.namecheap) {
+          saveNamecheapConfig(
+            data.namecheap.apiUser,
+            data.namecheap.apiKey,
+            data.namecheap.clientIP
           );
         }
         if (data.github) {
