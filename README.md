@@ -4,11 +4,11 @@
 
 **Free hosting deserves free tooling. Domain → GitHub Pages in 60 seconds.**
 
-I'm [Abe Diaz](https://abediaz.ai). By day, I lead Amazon's disaster relief team, which uses technology and logistics to deliver 26+ million relief items across 200+ disasters worldwide. On weekends, I use AI to build artisanal tools like this.
-
 gg-deploy is my latest: domain deployment automated, built in a weekend, open source, free forever. It's not going to save the world, but it might save you an hour of DNS configuration.
 
 **One command. One click. One prompt.** Works via CLI, desktop app, web UI, or AI assistant (MCP).
+
+Hola. I'm [Abe Diaz](https://abediaz.ai). By day, I lead Amazon's disaster relief team, which uses technology and logistics to deliver 26+ million relief items across 200+ disasters worldwide. On weekends, I use AI to build artisanal tools like this.
 
 ## Quick Start
 
