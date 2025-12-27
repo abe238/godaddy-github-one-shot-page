@@ -131,23 +131,35 @@ jobs:
           RELEASE_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           BASE_URL="https://github.com/abe238/gg-deploy/releases/download/v${VERSION}"
 
-          # Read signatures
+          # Debug: list all downloaded artifacts
+          echo "Downloaded artifacts:"
+          ls -la artifacts/
+
+          # Read signatures - Tauri generates tar.gz without version in filename
           MACOS_ARM_SIG=""
           MACOS_X64_SIG=""
           LINUX_SIG=""
           WINDOWS_SIG=""
 
-          if [ -f "artifacts/GG Deploy_${VERSION}_aarch64.app.tar.gz.sig" ]; then
-            MACOS_ARM_SIG=$(cat "artifacts/GG Deploy_${VERSION}_aarch64.app.tar.gz.sig")
+          # macOS ARM64 (tar.gz without version)
+          if [ -f "artifacts/GG.Deploy_aarch64.app.tar.gz.sig" ]; then
+            MACOS_ARM_SIG=$(cat "artifacts/GG.Deploy_aarch64.app.tar.gz.sig")
+            echo "Found macOS ARM sig"
           fi
-          if [ -f "artifacts/GG Deploy_${VERSION}_x64.app.tar.gz.sig" ]; then
-            MACOS_X64_SIG=$(cat "artifacts/GG Deploy_${VERSION}_x64.app.tar.gz.sig")
+          # macOS x64 (tar.gz without version)
+          if [ -f "artifacts/GG.Deploy_x64.app.tar.gz.sig" ]; then
+            MACOS_X64_SIG=$(cat "artifacts/GG.Deploy_x64.app.tar.gz.sig")
+            echo "Found macOS x64 sig"
           fi
-          if [ -f "artifacts/GG Deploy_${VERSION}_amd64.AppImage.tar.gz.sig" ]; then
-            LINUX_SIG=$(cat "artifacts/GG Deploy_${VERSION}_amd64.AppImage.tar.gz.sig")
+          # Linux AppImage (with version)
+          if [ -f "artifacts/GG.Deploy_${VERSION}_amd64.AppImage.sig" ]; then
+            LINUX_SIG=$(cat "artifacts/GG.Deploy_${VERSION}_amd64.AppImage.sig")
+            echo "Found Linux sig"
           fi
-          if [ -f "artifacts/GG Deploy_${VERSION}_x64-setup.nsis.zip.sig" ]; then
-            WINDOWS_SIG=$(cat "artifacts/GG Deploy_${VERSION}_x64-setup.nsis.zip.sig")
+          # Windows NSIS (exe with version)
+          if [ -f "artifacts/GG.Deploy_${VERSION}_x64-setup.exe.sig" ]; then
+            WINDOWS_SIG=$(cat "artifacts/GG.Deploy_${VERSION}_x64-setup.exe.sig")
+            echo "Found Windows sig"
           fi
 
           cat > latest.json << EOF
@@ -158,19 +170,19 @@ jobs:
             "platforms": {
               "darwin-aarch64": {
                 "signature": "${MACOS_ARM_SIG}",
-                "url": "${BASE_URL}/GG.Deploy_${VERSION}_aarch64.app.tar.gz"
+                "url": "${BASE_URL}/GG.Deploy_aarch64.app.tar.gz"
               },
               "darwin-x86_64": {
                 "signature": "${MACOS_X64_SIG}",
-                "url": "${BASE_URL}/GG.Deploy_${VERSION}_x64.app.tar.gz"
+                "url": "${BASE_URL}/GG.Deploy_x64.app.tar.gz"
               },
               "linux-x86_64": {
                 "signature": "${LINUX_SIG}",
-                "url": "${BASE_URL}/GG.Deploy_${VERSION}_amd64.AppImage.tar.gz"
+                "url": "${BASE_URL}/GG.Deploy_${VERSION}_amd64.AppImage"
               },
               "windows-x86_64": {
                 "signature": "${WINDOWS_SIG}",
-                "url": "${BASE_URL}/GG.Deploy_${VERSION}_x64-setup.nsis.zip"
+                "url": "${BASE_URL}/GG.Deploy_${VERSION}_x64-setup.exe"
               }
             }
           }

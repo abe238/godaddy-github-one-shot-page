@@ -231,20 +231,83 @@ Hover over badges for detailed status. Click the refresh button to re-test conne
 
 ## CLI Commands
 
-| Command | Description | Safe |
-|---------|-------------|------|
-| `plan <domain> <repo>` | Preview changes | Yes |
-| `apply <domain> <repo>` | Execute deployment | No |
-| `status <domain> <repo>` | Check health | Yes |
-| `ui` | Launch web interface | Yes |
-| `mcp-serve` | Start MCP server | Yes |
-| `describe` | Output tool schema | Yes |
+| Command | Description | Safe | Git Required |
+|---------|-------------|------|--------------|
+| `plan <domain> <repo>` | Preview changes | Yes | No |
+| `apply <domain> <repo>` | Execute deployment | No | No |
+| `status <domain> <repo>` | Check health | Yes | No |
+| `list` | Show all tracked deployments | Yes | No |
+| `push [domain] [message]` | Upload local file changes | No | **No** |
+| `forget <domain>` | Remove from tracking | Yes | No |
+| `ui` | Launch web interface | Yes | No |
+| `mcp-serve` | Start MCP server | Yes | No |
+| `update` | Check for updates | Yes | No |
+| `describe` | Output AI-friendly tool schema | Yes | No |
 
 Add `--output json` for machine-readable output.
 
-## Claude Code / MCP
+### Git-Free File Updates
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+The `push` command uploads your local files directly to GitHub via API—no git knowledge required:
+
+```bash
+# From your project directory (auto-detects deployment)
+gg-deploy push "Updated homepage"
+
+# Or specify the domain explicitly
+gg-deploy push myblog.com "Fixed typo in about page"
+```
+
+**How it works:**
+1. Scans your local directory for changed files
+2. Compares SHA hashes with GitHub
+3. Uploads only changed files via GitHub Contents API
+4. Files >1MB use Git Data API for reliability
+5. Files >100MB are skipped (GitHub limit)
+
+**Respects `.gitignore` and `.gg-ignore`** — node_modules, .env, and other patterns are automatically excluded.
+
+### Deployment Tracking
+
+After `apply` succeeds, gg-deploy remembers your deployment:
+
+```bash
+# List all tracked deployments
+gg-deploy list
+
+# Output:
+# ╭─ Tracked Deployments ─────────────────────────────────────╮
+# │  myblog.com → user/blog                                   │
+# │  └─ /Users/me/projects/myblog                             │
+# │     Last activity: 2 hours ago                            │
+# ╰───────────────────────────────────────────────────────────╯
+```
+
+To stop tracking (doesn't affect live site):
+```bash
+gg-deploy forget myblog.com
+```
+
+**Note:** `forget` only removes local tracking. Your DNS records and GitHub Pages remain active. See the output for cleanup instructions.
+
+## AI Agent Integration (MCP)
+
+gg-deploy includes a full MCP (Model Context Protocol) server, enabling AI assistants to deploy and manage sites directly.
+
+**Compatible with:**
+- Claude Desktop
+- Claude Code
+- Cursor
+- Windsurf
+- N8N (workflow automation)
+- Any MCP-compatible client
+
+### Setup
+
+**Claude Desktop / Claude Code** — Add to config:
+
+macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
@@ -257,7 +320,34 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Then tell Claude: "Deploy example.com using user/repo"
+**Cursor / Windsurf** — Add to MCP settings with the same configuration.
+
+**N8N** — Use the MCP node with command: `npx -y gg-deploy mcp-serve`
+
+### Available MCP Tools
+
+| Tool | Description | Safe |
+|------|-------------|------|
+| `deploy_site_plan` | Preview deployment changes | Yes |
+| `deploy_site_apply` | Execute DNS + GitHub Pages deployment | No |
+| `deploy_site_status` | Check deployment health | Yes |
+| `list_deployments` | List all tracked deployments | Yes |
+| `push_changes` | Upload local file changes | No |
+
+### Example Prompts
+
+- "Deploy myblog.com to user/repo"
+- "Check the status of example.com"
+- "What deployments do I have?"
+- "Push my latest changes to the blog"
+
+### AI Discovery
+
+Run `gg-deploy describe` to get a comprehensive JSON schema with:
+- Command descriptions and intents
+- Example inputs and outputs
+- Safety indicators (safe/requires confirmation)
+- Recommended usage flows
 
 ## Troubleshooting
 

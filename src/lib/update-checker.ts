@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 import chalk from 'chalk';
 
-const CURRENT_VERSION = '2.0.0';
+const CURRENT_VERSION = '2.5.0';
 const GITHUB_REPO = 'abe238/gg-deploy';
 const CACHE_DIR = join(homedir(), '.gg-deploy');
 const CACHE_FILE = join(CACHE_DIR, 'update-cache.json');

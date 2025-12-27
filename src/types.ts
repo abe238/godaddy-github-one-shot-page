@@ -80,3 +80,32 @@ export interface StatusResult {
   ssl_status: 'pending' | 'active' | 'error' | 'unknown';
   health: 'healthy' | 'degraded' | 'error';
 }
+
+export interface Deployment {
+  id: string;
+  domain: string;
+  repo: string;
+  localPath: string;
+  provider: ProviderName;
+  createdAt: string;
+  lastActivity: string;
+}
+
+export interface DeploymentsStore {
+  version: 1;
+  deployments: Deployment[];
+}
+
+export interface FileChange {
+  path: string;
+  action: 'create' | 'update' | 'delete';
+  size?: number;
+}
+
+export interface PushResult {
+  domain: string;
+  repo: string;
+  filesChanged: FileChange[];
+  message: string;
+  success: boolean;
+}

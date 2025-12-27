@@ -4,6 +4,7 @@ import type { OutputFormat, CommandResult } from '../types.js';
 import { DNSProviderError } from '../types.js';
 import { DNSProviderFactory } from '../services/dns-factory.js';
 import { GitHubService } from '../services/github.js';
+import { addDeployment } from '../config.js';
 
 export async function applyCommand(
   domain: string,
@@ -67,6 +68,10 @@ export async function applyCommand(
     await github.setCustomDomain(repo, domain);
     spinner?.succeed('Custom domain set');
     result.completed_steps.push('set_custom_domain');
+
+    // Save deployment for future reference (push/list commands)
+    addDeployment(domain, repo, process.cwd(), dns.name);
+    result.completed_steps.push('save_deployment');
 
     log('');
     log(chalk.green('=== Deployment Complete ==='));

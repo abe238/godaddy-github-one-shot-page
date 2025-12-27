@@ -28,7 +28,7 @@ function getUiDir(): string {
   }
   // When running as ESM module, derive from import.meta.url
   try {
-    const srcDir = dirname(fileURLToPath(new URL('.', import.meta.url)));
+    const srcDir = dirname(fileURLToPath(import.meta.url));
     return join(srcDir, '..', 'ui', 'dist');
   } catch {
     // Fallback for CJS bundled by esbuild or direct node execution

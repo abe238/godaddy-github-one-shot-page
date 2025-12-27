@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { randomBytes } from 'crypto';
 
-import type { ProviderName } from './types.js';
+import type { ProviderName, Deployment, DeploymentsStore } from './types.js';
 
 export interface GoDaddyConfig {
   apiKey: string;
@@ -172,4 +173,133 @@ export function getAuthStatus(): AuthStatus {
       tokenPreview: github ? `${github.token.slice(0, 4)}...${github.token.slice(-4)}` : undefined,
     },
   };
+}
+
+// ============================================================================
+// Deployment History Storage (separate from credentials for security)
+// ============================================================================
+
+const DEPLOYMENTS_FILE = join(CONFIG_DIR, 'deployments.json');
+
+/**
+ * Normalizes a domain input by removing protocol, www prefix, trailing slashes, and lowercasing.
+ * Handles variations like: https://example.com/, http://www.example.com, EXAMPLE.COM/
+ */
+export function normalizeDomain(input: string): string {
+  let domain = input.trim().toLowerCase();
+
+  // Remove protocol
+  domain = domain.replace(/^https?:\/\//, '');
+
+  // Remove www. prefix
+  domain = domain.replace(/^www\./, '');
+
+  // Remove trailing slashes and paths
+  domain = domain.replace(/\/.*$/, '');
+
+  // Remove port if present
+  domain = domain.replace(/:\d+$/, '');
+
+  return domain;
+}
+
+function generateId(): string {
+  return randomBytes(8).toString('hex');
+}
+
+export function getDeploymentsPath(): string {
+  return DEPLOYMENTS_FILE;
+}
+
+export function readDeployments(): DeploymentsStore {
+  if (!existsSync(DEPLOYMENTS_FILE)) {
+    return { version: 1, deployments: [] };
+  }
+  try {
+    const content = readFileSync(DEPLOYMENTS_FILE, 'utf-8');
+    const data = JSON.parse(content) as DeploymentsStore;
+    if (!data.version || !Array.isArray(data.deployments)) {
+      return { version: 1, deployments: [] };
+    }
+    return data;
+  } catch {
+    return { version: 1, deployments: [] };
+  }
+}
+
+export function writeDeployments(store: DeploymentsStore): void {
+  ensureConfigDir();
+  writeFileSync(DEPLOYMENTS_FILE, JSON.stringify(store, null, 2), { mode: 0o644 });
+}
+
+export function addDeployment(
+  domain: string,
+  repo: string,
+  localPath: string,
+  provider: ProviderName
+): Deployment {
+  const store = readDeployments();
+  const normalizedDomain = normalizeDomain(domain);
+  const existing = store.deployments.find(d => normalizeDomain(d.domain) === normalizedDomain);
+
+  if (existing) {
+    existing.repo = repo;
+    existing.localPath = localPath;
+    existing.provider = provider;
+    existing.lastActivity = new Date().toISOString();
+    writeDeployments(store);
+    return existing;
+  }
+
+  const deployment: Deployment = {
+    id: generateId(),
+    domain: normalizedDomain,
+    repo,
+    localPath,
+    provider,
+    createdAt: new Date().toISOString(),
+    lastActivity: new Date().toISOString(),
+  };
+
+  store.deployments.push(deployment);
+  writeDeployments(store);
+  return deployment;
+}
+
+export function getDeployment(domain: string): Deployment | null {
+  const store = readDeployments();
+  const normalized = normalizeDomain(domain);
+  return store.deployments.find(d => normalizeDomain(d.domain) === normalized) || null;
+}
+
+export function getDeploymentByPath(localPath: string): Deployment | null {
+  const store = readDeployments();
+  return store.deployments.find(d => d.localPath === localPath) || null;
+}
+
+export function updateDeploymentActivity(domain: string): void {
+  const store = readDeployments();
+  const normalized = normalizeDomain(domain);
+  const deployment = store.deployments.find(d => normalizeDomain(d.domain) === normalized);
+  if (deployment) {
+    deployment.lastActivity = new Date().toISOString();
+    writeDeployments(store);
+  }
+}
+
+export function removeDeployment(domain: string): boolean {
+  const store = readDeployments();
+  const normalized = normalizeDomain(domain);
+  const index = store.deployments.findIndex(d => normalizeDomain(d.domain) === normalized);
+  if (index === -1) return false;
+  store.deployments.splice(index, 1);
+  writeDeployments(store);
+  return true;
+}
+
+export function listDeployments(): Deployment[] {
+  const store = readDeployments();
+  return store.deployments.sort((a, b) =>
+    new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+  );
 }

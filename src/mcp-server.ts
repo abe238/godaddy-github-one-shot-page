@@ -9,6 +9,8 @@ import {
 import { planCommand } from './commands/plan.js';
 import { applyCommand } from './commands/apply.js';
 import { statusCommand } from './commands/status.js';
+import { listCommand } from './commands/list.js';
+import { pushCommand } from './commands/push.js';
 import { CURRENT_VERSION } from './lib/update-checker.js';
 
 const server = new Server(
@@ -54,32 +56,77 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ['domain', 'repo'],
       },
     },
+    {
+      name: 'list_deployments',
+      description: 'List all tracked gg-deploy deployments with their domains, repos, and local paths. Safe to call anytime.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        required: [],
+      },
+    },
+    {
+      name: 'push_changes',
+      description: 'Push local file changes to a tracked deployment. Uploads modified files via GitHub API (git-free). Uses GitHub Contents API to sync files from local path to repository.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          domain: { type: 'string', description: 'Domain to push to (optional if running from tracked directory)' },
+          message: { type: 'string', description: 'Commit message for the changes' },
+        },
+        required: ['message'],
+      },
+    },
   ],
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
-  const domain = args?.domain as string;
-  const repo = args?.repo as string;
-
-  if (!domain || !repo) {
-    return {
-      content: [{ type: 'text', text: JSON.stringify({ error: 'domain and repo are required' }) }],
-      isError: true,
-    };
-  }
+  const domain = args?.domain as string | undefined;
+  const repo = args?.repo as string | undefined;
+  const message = args?.message as string | undefined;
 
   try {
     let result;
     switch (name) {
       case 'deploy_site_plan':
+        if (!domain || !repo) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ error: 'domain and repo are required' }) }],
+            isError: true,
+          };
+        }
         result = await planCommand(domain, repo, 'json');
         break;
       case 'deploy_site_apply':
+        if (!domain || !repo) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ error: 'domain and repo are required' }) }],
+            isError: true,
+          };
+        }
         result = await applyCommand(domain, repo, 'json');
         break;
       case 'deploy_site_status':
+        if (!domain || !repo) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ error: 'domain and repo are required' }) }],
+            isError: true,
+          };
+        }
         result = await statusCommand(domain, repo, 'json');
+        break;
+      case 'list_deployments':
+        result = await listCommand('json');
+        break;
+      case 'push_changes':
+        if (!message) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ error: 'message is required' }) }],
+            isError: true,
+          };
+        }
+        result = await pushCommand(domain, message, 'json');
         break;
       default:
         return {
