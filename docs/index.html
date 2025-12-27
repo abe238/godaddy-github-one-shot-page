@@ -21,6 +21,17 @@
       --text-primary: #e2e8f0;
       --text-muted: #718096;
       --text-dim: #4a5568;
+
+      /* Framer Motion-inspired spring easing curves */
+      --spring-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --spring-smooth: cubic-bezier(0.23, 1, 0.32, 1);
+      --spring-snappy: cubic-bezier(0.68, -0.6, 0.32, 1.6);
+      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+      /* Animation timing */
+      --duration-fast: 0.15s;
+      --duration-normal: 0.3s;
+      --duration-slow: 0.5s;
     }
 
     * {
@@ -107,6 +118,59 @@
         radial-gradient(ellipse at 50% 50%, rgba(10, 22, 40, 0.9) 0%, transparent 100%);
       pointer-events: none;
       z-index: 1;
+    }
+
+    /* Floating orbs - ambient motion */
+    .floating-orbs {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.4;
+      animation: float-orb 20s ease-in-out infinite;
+    }
+
+    .orb--cyan {
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, var(--cyan-glow), transparent 70%);
+      top: 10%;
+      left: 5%;
+      animation-delay: 0s;
+    }
+
+    .orb--orange {
+      width: 350px;
+      height: 350px;
+      background: radial-gradient(circle, var(--orange-hot), transparent 70%);
+      top: 60%;
+      right: 10%;
+      animation-delay: -7s;
+      animation-duration: 25s;
+    }
+
+    .orb--blue {
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, var(--cyan-bright), transparent 70%);
+      bottom: 20%;
+      left: 30%;
+      animation-delay: -14s;
+      animation-duration: 22s;
+    }
+
+    @keyframes float-orb {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      25% { transform: translate(30px, -20px) scale(1.05); }
+      50% { transform: translate(-20px, 30px) scale(0.95); }
+      75% { transform: translate(20px, 20px) scale(1.02); }
     }
 
     /* Main Content */
@@ -386,7 +450,27 @@
       font-weight: 600;
       font-size: 1rem;
       text-decoration: none;
-      transition: all 0.3s ease;
+      transition: all var(--duration-normal) var(--spring-smooth);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent);
+      opacity: 0;
+      transition: opacity var(--duration-fast);
+    }
+
+    .btn:hover::before {
+      opacity: 1;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+      transition-duration: var(--duration-fast);
     }
 
     .btn-primary {
@@ -396,8 +480,18 @@
     }
 
     .btn-primary:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 8px 40px rgba(237, 137, 54, 0.4);
+      transform: translateY(-3px) scale(1.02);
+      box-shadow:
+        0 12px 40px rgba(237, 137, 54, 0.4),
+        0 0 0 1px rgba(237, 137, 54, 0.3);
+    }
+
+    .btn-primary svg {
+      transition: transform var(--duration-normal) var(--spring-bounce);
+    }
+
+    .btn-primary:hover svg {
+      transform: rotate(-8deg) scale(1.1);
     }
 
     .btn-secondary {
@@ -409,6 +503,8 @@
     .btn-secondary:hover {
       background: rgba(79, 209, 197, 0.2);
       border-color: var(--cyan-glow);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(79, 209, 197, 0.15);
     }
 
     /* Scroll Indicator */
@@ -492,9 +588,11 @@
       border: 1px solid rgba(79, 209, 197, 0.12);
       border-radius: 20px;
       padding: 2rem;
-      transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+      transition: all var(--duration-normal) var(--spring-smooth);
       position: relative;
       overflow: hidden;
+      transform-style: preserve-3d;
+      perspective: 1000px;
     }
 
     .feature-card::before {
@@ -509,18 +607,37 @@
       -webkit-mask-composite: xor;
       mask-composite: exclude;
       opacity: 0;
-      transition: opacity 0.4s;
+      transition: opacity var(--duration-normal);
+    }
+
+    /* Glow effect on hover */
+    .feature-card::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 120%;
+      height: 120%;
+      background: radial-gradient(circle, rgba(79, 209, 197, 0.08), transparent 60%);
+      transform: translate(-50%, -50%);
+      opacity: 0;
+      transition: opacity var(--duration-slow);
+      pointer-events: none;
     }
 
     .feature-card:hover {
-      transform: translateY(-4px) scale(1.01);
+      transform: translateY(-6px) rotateX(2deg);
       border-color: transparent;
       box-shadow:
-        0 25px 50px -12px rgba(0, 0, 0, 0.5),
-        0 0 40px rgba(79, 209, 197, 0.08);
+        0 30px 60px -15px rgba(0, 0, 0, 0.5),
+        0 0 50px rgba(79, 209, 197, 0.1);
     }
 
     .feature-card:hover::before {
+      opacity: 1;
+    }
+
+    .feature-card:hover::after {
       opacity: 1;
     }
 
@@ -954,6 +1071,13 @@
 
   <div class="gradient-overlay"></div>
 
+  <!-- Floating ambient orbs -->
+  <div class="floating-orbs">
+    <div class="orb orb--cyan"></div>
+    <div class="orb orb--orange"></div>
+    <div class="orb orb--blue"></div>
+  </div>
+
   <div class="content">
     <!-- Navigation -->
     <nav>
@@ -1172,36 +1296,120 @@
   </div>
 
   <script>
-    // Smooth reveal on scroll
+    // Spring easing for JS animations
+    const spring = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
+    const smooth = 'cubic-bezier(0.23, 1, 0.32, 1)';
+
+    // Smooth reveal on scroll with spring physics
     const observerOptions = {
-      threshold: 0.1,
-      rootMargin: '0px 0px -50px 0px'
+      threshold: 0.15,
+      rootMargin: '0px 0px -80px 0px'
     };
 
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
-          entry.target.style.opacity = '1';
-          entry.target.style.transform = 'translateY(0)';
+          entry.target.classList.add('revealed');
         }
       });
     }, observerOptions);
 
-    document.querySelectorAll('.feature-card, .step').forEach(el => {
-      el.style.opacity = '0';
-      el.style.transform = 'translateY(20px)';
-      el.style.transition = 'opacity 0.35s ease-out, transform 0.35s ease-out';
+    // Add reveal styles via CSS class for better performance
+    const style = document.createElement('style');
+    style.textContent = `
+      .reveal-element {
+        opacity: 0;
+        transform: translateY(25px);
+        transition: opacity 0.5s ${smooth}, transform 0.5s ${spring};
+      }
+      .reveal-element.revealed {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    `;
+    document.head.appendChild(style);
+
+    document.querySelectorAll('.feature-card, .step, .cta-box').forEach((el, index) => {
+      el.classList.add('reveal-element');
+      el.style.transitionDelay = `${index * 0.06}s`;
       observer.observe(el);
     });
 
-    // Stagger feature cards (faster)
-    document.querySelectorAll('.feature-card').forEach((card, index) => {
-      card.style.transitionDelay = `${index * 0.05}s`;
+    // Magnetic button effect
+    document.querySelectorAll('.btn-primary').forEach(btn => {
+      btn.addEventListener('mousemove', (e) => {
+        const rect = btn.getBoundingClientRect();
+        const x = e.clientX - rect.left - rect.width / 2;
+        const y = e.clientY - rect.top - rect.height / 2;
+        btn.style.transform = `translateY(-3px) scale(1.02) translate(${x * 0.1}px, ${y * 0.1}px)`;
+      });
+
+      btn.addEventListener('mouseleave', () => {
+        btn.style.transform = '';
+      });
     });
 
-    // Stagger steps (faster)
-    document.querySelectorAll('.step').forEach((step, index) => {
-      step.style.transitionDelay = `${index * 0.08}s`;
+    // Icon hover rotation for feature cards
+    document.querySelectorAll('.feature-card').forEach(card => {
+      const icon = card.querySelector('.feature-icon');
+      if (icon) {
+        card.addEventListener('mouseenter', () => {
+          icon.style.transform = 'scale(1.1) rotate(-5deg)';
+          icon.style.transition = `transform 0.4s ${spring}`;
+        });
+        card.addEventListener('mouseleave', () => {
+          icon.style.transform = '';
+        });
+      }
+    });
+
+    // Parallax effect for floating orbs on mouse move
+    let mouseX = 0, mouseY = 0;
+    let orbX = 0, orbY = 0;
+
+    document.addEventListener('mousemove', (e) => {
+      mouseX = (e.clientX / window.innerWidth - 0.5) * 30;
+      mouseY = (e.clientY / window.innerHeight - 0.5) * 30;
+    });
+
+    function animateOrbs() {
+      orbX += (mouseX - orbX) * 0.05;
+      orbY += (mouseY - orbY) * 0.05;
+
+      document.querySelectorAll('.orb').forEach((orb, i) => {
+        const factor = (i + 1) * 0.5;
+        orb.style.transform = `translate(${orbX * factor}px, ${orbY * factor}px)`;
+      });
+
+      requestAnimationFrame(animateOrbs);
+    }
+    animateOrbs();
+
+    // Terminal typing effect enhancement
+    const terminalCursor = document.querySelector('.terminal-cursor');
+    if (terminalCursor) {
+      setInterval(() => {
+        terminalCursor.style.opacity = terminalCursor.style.opacity === '0' ? '1' : '0';
+      }, 530);
+    }
+
+    // Nav link hover underline animation
+    document.querySelectorAll('.nav-links a:not(.nav-cta)').forEach(link => {
+      link.style.position = 'relative';
+      const underline = document.createElement('span');
+      underline.style.cssText = `
+        position: absolute;
+        bottom: -4px;
+        left: 0;
+        width: 0;
+        height: 2px;
+        background: var(--cyan-glow);
+        transition: width 0.3s ${spring};
+      `;
+      link.appendChild(underline);
+
+      link.addEventListener('mouseenter', () => underline.style.width = '100%');
+      link.addEventListener('mouseleave', () => underline.style.width = '0');
     });
   </script>
 </body>
