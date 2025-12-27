@@ -32,6 +32,20 @@ I wanted deployment to be as fast as the hosting is free (for public repos). So 
 
 **AGPL-licensed** because good tools should stay free.
 
+## Screenshots
+
+### CLI
+![CLI Help](img/mockup-cli-help.png)
+![CLI Plan](img/mockup-cli-plan.png)
+
+### Desktop App
+![Desktop Main](img/mockup-desktop-main.png)
+![Desktop Settings](img/mockup-desktop-settings.png)
+
+### Web UI
+![Web UI Main](img/mockup-webui-main.png)
+![Web UI Settings](img/mockup-webui-settings.png)
+
 ## Desktop App
 
 Download from [GitHub Releases](https://github.com/abe238/gg-deploy/releases):
