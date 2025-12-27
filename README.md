@@ -33,8 +33,9 @@ I wanted deployment to be as fast as the hosting is free (for public repos). So 
 ## Screenshots
 
 ### CLI
-![CLI Help](img/mockup-cli-help.png)
-![CLI Plan](img/mockup-cli-plan.png)
+![CLI Help](img/cli-help-v2.png)
+![CLI List](img/cli-list-v2.png)
+![CLI Push](img/cli-push-v2.png)
 
 ### Desktop App
 ![Desktop Main](img/mockup-desktop-main.png)
