@@ -1,6 +1,6 @@
 [package]
 name = "gg-deploy"
-version = "1.1.1"
+version = "2.1.0"
 description = "Free hosting deserves free tooling. Domain to GitHub Pages in 60 seconds."
 authors = ["Abe Diaz <info@abediaz.ai>"]
 license = "AGPL-3.0-only"
@@ -22,6 +22,7 @@ tauri-build = { version = "2.5.3", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
+dirs = "5.0"
 tauri = { version = "2.9.5", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-updater = "2"

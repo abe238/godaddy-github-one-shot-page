@@ -1,8 +1,24 @@
 import { useState, useEffect } from 'react'
 import { check, Update } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 
 type DNSProvider = 'godaddy' | 'cloudflare' | 'namecheap'
+
+// Check if running in Tauri desktop app
+const isTauri = () => {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+}
+
+// Tauri config types (matching Rust structs)
+type TauriConfig = {
+  dnsProvider?: string | null
+  godaddy?: { apiKey?: string | null; apiSecret?: string | null; environment?: string | null } | null
+  cloudflare?: { apiToken?: string | null } | null
+  namecheap?: { apiUser?: string | null; apiKey?: string | null; clientIP?: string | null } | null
+  github?: { token?: string | null } | null
+}
 
 type AuthStatus = {
   godaddy: { configured: boolean; keyPreview?: string }
@@ -128,6 +144,7 @@ function App() {
   const [updateDismissed, setUpdateDismissed] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [updateProgress, setUpdateProgress] = useState<string>('')
+  const [updateCheckMessage, setUpdateCheckMessage] = useState<string | null>(null)
 
   // Setup form
   const [dnsProvider, setDnsProvider] = useState<DNSProvider>('godaddy')
@@ -154,16 +171,43 @@ function App() {
   useEffect(() => {
     checkAuth()
     checkForUpdates()
+
+    // Listen for menu "Check for Updates" event
+    let unlisten: (() => void) | undefined
+    if (isTauri()) {
+      listen('check-for-updates', () => {
+        checkForUpdates(true) // manual check with feedback
+      }).then(fn => {
+        unlisten = fn
+      })
+    }
+    return () => {
+      if (unlisten) unlisten()
+    }
   }, [])
 
-  const checkForUpdates = async () => {
+  const checkForUpdates = async (manual = false) => {
     try {
+      if (manual) {
+        setUpdateCheckMessage('Checking for updates...')
+      }
       const update = await check()
       if (update) {
         setUpdateAvailable(update)
+        setUpdateDismissed(false) // Show banner if dismissed previously
+        if (manual) {
+          setUpdateCheckMessage(null) // Clear message, banner will show
+        }
+      } else if (manual) {
+        setUpdateCheckMessage("You're up to date!")
+        // Auto-dismiss after 3 seconds
+        setTimeout(() => setUpdateCheckMessage(null), 3000)
       }
     } catch {
-      // Silently ignore update check failures (not in Tauri, network issues, etc.)
+      if (manual) {
+        setUpdateCheckMessage('Could not check for updates')
+        setTimeout(() => setUpdateCheckMessage(null), 3000)
+      }
     }
   }
 
@@ -191,14 +235,64 @@ function App() {
 
   const checkAuth = async () => {
     try {
-      const res = await fetch('/api/auth-status')
-      const status: AuthStatus = await res.json()
-      setAuthStatus(status)
-      const dnsConfigured = status.godaddy?.configured || status.cloudflare?.configured || status.namecheap?.configured
-      const isReady = dnsConfigured && status.github.configured
-      setState(isReady ? 'ready' : 'setup')
-      if (isReady) {
-        testConnection()
+      if (isTauri()) {
+        // Desktop app: read config directly via Tauri command
+        const config = await invoke<TauriConfig>('read_config')
+        const gdConfigured = !!(config.godaddy?.apiKey && config.godaddy?.apiSecret)
+        const cfConfigured = !!config.cloudflare?.apiToken
+        const ncConfigured = !!(config.namecheap?.apiUser && config.namecheap?.apiKey)
+        const ghConfigured = !!config.github?.token
+
+        const status: AuthStatus = {
+          godaddy: {
+            configured: gdConfigured,
+            keyPreview: gdConfigured ? `${config.godaddy!.apiKey!.slice(0, 4)}...` : undefined
+          },
+          cloudflare: {
+            configured: cfConfigured,
+            tokenPreview: cfConfigured ? `${config.cloudflare!.apiToken!.slice(0, 4)}...` : undefined
+          },
+          namecheap: {
+            configured: ncConfigured,
+            userPreview: ncConfigured ? config.namecheap!.apiUser! : undefined
+          },
+          github: {
+            configured: ghConfigured,
+            tokenPreview: ghConfigured ? `${config.github!.token!.slice(0, 7)}...` : undefined
+          },
+        }
+        setAuthStatus(status)
+
+        // Set DNS provider from config
+        if (config.dnsProvider) {
+          setDnsProvider(config.dnsProvider as DNSProvider)
+        }
+
+        const dnsConfigured = gdConfigured || cfConfigured || ncConfigured
+        const isReady = dnsConfigured && ghConfigured
+        setState(isReady ? 'ready' : 'setup')
+
+        // In Tauri mode, we can't test connections yet (no backend)
+        // Just set a basic connection status
+        if (isReady) {
+          setConnectionStatus({
+            godaddy: { configured: gdConfigured, verified: gdConfigured, error: null },
+            cloudflare: { configured: cfConfigured, verified: cfConfigured, error: null },
+            namecheap: { configured: ncConfigured, verified: ncConfigured, error: null },
+            github: { configured: ghConfigured, verified: ghConfigured, error: null, user: null },
+          })
+        }
+      } else {
+        // Web mode: use backend API
+        const res = await fetch('/api/auth-status')
+        const status: AuthStatus = await res.json()
+        setAuthStatus(status)
+        const dnsConfigured = status.godaddy?.configured || status.cloudflare?.configured || status.namecheap?.configured
+        const isReady = dnsConfigured && status.github.configured
+        setState(isReady ? 'ready' : 'setup')
+        if (isReady) {
+          testConnection()
+        }
       }
     } catch {
       setState('setup')
@@ -206,6 +300,11 @@ function App() {
   }
 
   const testConnection = async () => {
+    if (isTauri()) {
+      // In Tauri mode, we don't have a backend to test connections
+      // Connection status is set in checkAuth based on config presence
+      return
+    }
     setTesting(true)
     try {
       const res = await fetch('/api/test-connection')
@@ -220,26 +319,56 @@ function App() {
 
   const fetchConfigValues = async () => {
     try {
-      const res = await fetch('/api/config/values')
-      const config: SavedConfig = await res.json()
-      // Pre-fill inputs with saved values
-      if (config.dnsProvider) {
-        setDnsProvider(config.dnsProvider)
-      }
-      if (config.godaddy) {
-        setGdKey(config.godaddy.apiKey)
-        setGdSecret(config.godaddy.apiSecret)
-      }
-      if (config.cloudflare) {
-        setCfToken(config.cloudflare.apiToken)
-      }
-      if (config.namecheap) {
-        setNcUser(config.namecheap.apiUser)
-        setNcKey(config.namecheap.apiKey)
-        setNcIP(config.namecheap.clientIP)
-      }
-      if (config.github) {
-        setGhToken(config.github.token)
+      if (isTauri()) {
+        // Desktop app: read config directly via Tauri command
+        const config = await invoke<TauriConfig>('read_config')
+        if (config.dnsProvider) {
+          setDnsProvider(config.dnsProvider as DNSProvider)
+        }
+        if (config.godaddy?.apiKey) {
+          setGdKey(config.godaddy.apiKey)
+        }
+        if (config.godaddy?.apiSecret) {
+          setGdSecret(config.godaddy.apiSecret)
+        }
+        if (config.cloudflare?.apiToken) {
+          setCfToken(config.cloudflare.apiToken)
+        }
+        if (config.namecheap?.apiUser) {
+          setNcUser(config.namecheap.apiUser)
+        }
+        if (config.namecheap?.apiKey) {
+          setNcKey(config.namecheap.apiKey)
+        }
+        if (config.namecheap?.clientIP) {
+          setNcIP(config.namecheap.clientIP)
+        }
+        if (config.github?.token) {
+          setGhToken(config.github.token)
+        }
+      } else {
+        // Web mode: use backend API
+        const res = await fetch('/api/config/values')
+        const config: SavedConfig = await res.json()
+        // Pre-fill inputs with saved values
+        if (config.dnsProvider) {
+          setDnsProvider(config.dnsProvider)
+        }
+        if (config.godaddy) {
+          setGdKey(config.godaddy.apiKey)
+          setGdSecret(config.godaddy.apiSecret)
+        }
+        if (config.cloudflare) {
+          setCfToken(config.cloudflare.apiToken)
+        }
+        if (config.namecheap) {
+          setNcUser(config.namecheap.apiUser)
+          setNcKey(config.namecheap.apiKey)
+          setNcIP(config.namecheap.clientIP)
+        }
+        if (config.github) {
+          setGhToken(config.github.token)
+        }
       }
     } catch {
       // Ignore errors - inputs will just be empty
@@ -297,25 +426,47 @@ function App() {
   const saveConfig = async () => {
     setSaving(true)
     try {
-      const payload: Record<string, unknown> = { dnsProvider }
-      if (dnsProvider === 'godaddy' && gdKey && gdSecret) {
-        payload.godaddy = { apiKey: gdKey, apiSecret: gdSecret, environment: 'production' }
-      }
-      if (dnsProvider === 'cloudflare' && cfToken) {
-        payload.cloudflare = { apiToken: cfToken }
-      }
-      if (dnsProvider === 'namecheap' && ncUser && ncKey && ncIP) {
-        payload.namecheap = { apiUser: ncUser, apiKey: ncKey, clientIP: ncIP }
-      }
-      if (ghToken) {
-        payload.github = { token: ghToken }
-      }
+      if (isTauri()) {
+        // Desktop app: write config directly via Tauri command
+        const config: TauriConfig = {
+          dnsProvider,
+        }
+        if (dnsProvider === 'godaddy' && gdKey && gdSecret) {
+          config.godaddy = { apiKey: gdKey, apiSecret: gdSecret, environment: 'production' }
+        }
+        if (dnsProvider === 'cloudflare' && cfToken) {
+          config.cloudflare = { apiToken: cfToken }
+        }
+        if (dnsProvider === 'namecheap' && ncUser && ncKey && ncIP) {
+          config.namecheap = { apiUser: ncUser, apiKey: ncKey, clientIP: ncIP }
+        }
+        if (ghToken) {
+          config.github = { token: ghToken }
+        }
 
-      await fetch('/api/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
+        await invoke('write_config', { config })
+      } else {
+        // Web mode: use backend API
+        const payload: Record<string, unknown> = { dnsProvider }
+        if (dnsProvider === 'godaddy' && gdKey && gdSecret) {
+          payload.godaddy = { apiKey: gdKey, apiSecret: gdSecret, environment: 'production' }
+        }
+        if (dnsProvider === 'cloudflare' && cfToken) {
+          payload.cloudflare = { apiToken: cfToken }
+        }
+        if (dnsProvider === 'namecheap' && ncUser && ncKey && ncIP) {
+          payload.namecheap = { apiUser: ncUser, apiKey: ncKey, clientIP: ncIP }
+        }
+        if (ghToken) {
+          payload.github = { token: ghToken }
+        }
+
+        await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+      }
 
       // Reset visibility toggles
       setShowGdKey(false)
@@ -332,7 +483,9 @@ function App() {
       setNcIP('')
       setGhToken('')
       await checkAuth()
-      testConnection()
+      if (!isTauri()) {
+        testConnection()
+      }
       setShowSettings(false)
     } catch (e) {
       setError(String(e))
@@ -342,6 +495,12 @@ function App() {
   }
 
   const handleDeploy = async () => {
+    if (isTauri()) {
+      // Desktop app: deployment requires CLI for now
+      setError('Deployment requires CLI. Run: npx gg-deploy apply ' + domain + ' ' + repo)
+      return
+    }
+
     setState('deploying')
     setError(null)
 
@@ -406,6 +565,17 @@ function App() {
 
   // Update banner component
   const UpdateBanner = () => {
+    // Show check message (from menu "Check for Updates")
+    if (updateCheckMessage) {
+      return (
+        <div className="update-banner">
+          <div className="update-content">
+            <span className="update-text">{updateCheckMessage}</span>
+          </div>
+        </div>
+      )
+    }
+    // Show update available banner
     if (!updateAvailable || updateDismissed) return null
     return (
       <div className="update-banner">

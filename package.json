@@ -1,6 +1,6 @@
 {
   "name": "gg-deploy",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Free hosting deserves free tooling. Domain → GitHub Pages in 60 seconds.",
   "type": "module",
   "main": "dist/index.js",
