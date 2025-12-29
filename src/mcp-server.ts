@@ -12,6 +12,7 @@ import { statusCommand } from './commands/status.js';
 import { listCommand } from './commands/list.js';
 import { pushCommand } from './commands/push.js';
 import { CURRENT_VERSION } from './lib/update-checker.js';
+import { readConfig } from './config.js';
 
 const server = new Server(
   { name: 'gg-deploy', version: CURRENT_VERSION },
@@ -146,6 +147,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 export async function startMcpServer() {
+  // Check service configuration status
+  const config = readConfig();
+  const hasGitHub = !!config?.github?.token;
+  const hasGodaddy = !!(config?.godaddy?.apiKey && config?.godaddy?.apiSecret);
+  const hasCloudflare = !!config?.cloudflare?.apiToken;
+  const hasNamecheap = !!(config?.namecheap?.apiKey && config?.namecheap?.apiUser);
+  const hasDns = hasGodaddy || hasCloudflare || hasNamecheap;
+
+  // Startup message to stderr (stdout reserved for MCP protocol)
+  console.error('');
+  console.error('  gg-deploy MCP server running');
+  console.error('');
+  console.error('  Service Status:');
+  console.error(`    GitHub:     ${hasGitHub ? '✓' : '✗'}`);
+  console.error(`    GoDaddy:    ${hasGodaddy ? '✓' : '✗'}`);
+  console.error(`    Cloudflare: ${hasCloudflare ? '✓' : '✗'}`);
+  console.error(`    Namecheap:  ${hasNamecheap ? '✓' : '✗'}`);
+  console.error('');
+
+  if (!hasGitHub || !hasDns) {
+    console.error('  To configure, run:');
+    console.error('    npx gg-deploy ui');
+    console.error('');
+  }
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
